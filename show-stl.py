@@ -22,8 +22,8 @@ class OpenGlWin(QOpenGLWidget):
 
         # Kamera-Parameter
         self._camera_distance = 70.0  # start zoom distance
-        self._camera_azimuth = 0.0  # angle around y axis (horizontal angle)
-        self._camera_elevation = 0.0  # angle around x-axis (vertical angle)
+        self._camera_azimuth = 0.0  # horizontal angle in degree
+        self._camera_elevation = 0.0  # vertical angle in degree
         self._last_mouse_position = QPoint()
         self._is_right_button_pressed = False
 
@@ -175,7 +175,6 @@ class OpenGlWin(QOpenGLWidget):
         self._vao.bind()
 
         # use transformation
-        #model_matrix = self._create_translation_matrix(0, 0, -30)
         model_matrix = self._create_eye_matrix()
         view_matrix = self._calculate_view_matrix()
 
@@ -183,8 +182,8 @@ class OpenGlWin(QOpenGLWidget):
         elevation_rad = np.radians(self._camera_elevation)
         azimuth_rad = np.radians(self._camera_azimuth)
         camera_x = self._camera_distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        camera_y = self._camera_distance * np.sin(elevation_rad)
-        camera_z = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        camera_y = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        camera_z = self._camera_distance * np.sin(elevation_rad)
 
         # set init shader program
         self._shader_program.setUniformValue("model", model_matrix)
@@ -229,13 +228,13 @@ class OpenGlWin(QOpenGLWidget):
         """
         # calc camera position with azimuth and elevation
         x = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.sin(np.radians(self._camera_azimuth))
-        y = self._camera_distance * np.sin(np.radians(self._camera_elevation))
-        z = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.cos(np.radians(self._camera_azimuth))
+        y = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.cos(np.radians(self._camera_azimuth))
+        z = self._camera_distance * np.sin(np.radians(self._camera_elevation))
 
         # camera view point and "up"-vector
         eye = np.array([x, y, z], dtype=np.float32)
         center = np.array([0, 0, 0], dtype=np.float32)
-        up = np.array([0, 1, 0], dtype=np.float32)
+        up = np.array([0, 0, 1], dtype=np.float32)
 
         # View-Matrix berechnen
         f = center - eye
@@ -245,9 +244,9 @@ class OpenGlWin(QOpenGLWidget):
         u = np.cross(f, s)
 
         return QMatrix4x4(
-            s[0], u[0], f[0], -np.dot(s, eye),
-            s[1], u[1], f[1], -np.dot(u, eye),
-            s[2], u[2], f[2], np.dot(f, eye),
+            s[0], u[0], -f[0], -np.dot(s, eye),
+            s[1], u[1], -f[1], -np.dot(u, eye),
+            s[2], u[2], -f[2], np.dot(f, eye),
             0, 0, 0, 1
         )
 
@@ -263,21 +262,21 @@ class OpenGlWin(QOpenGLWidget):
     def mouseMoveEvent(self, event):
         if self._is_right_button_pressed:
             delta = event.position().toPoint() - self._last_mouse_position
-            self._camera_azimuth += delta.x() * 0.5  # Sensitivität für Azimuth
-            self._camera_elevation += delta.y() * 0.5  # Sensitivität für Elevation
+            self._camera_azimuth += delta.x() * 0.5  # sensitivity for azimuth
+            self._camera_elevation += delta.y() * 0.5  # sensitivity for elevation
 
-            # Begrenze Elevation, damit der Horizont immer gerade bleibt
+            # bound elevation
             self._camera_elevation = max(-89.0, min(89.0, self._camera_elevation))
 
             self._last_mouse_position = event.position().toPoint()
-            self.update()  # Bildschirm aktualisieren
+            self.update()  # update screen
 
     def wheelEvent(self, event):
-        # Zoom-Faktor anpassen (z.B., 1.1 für schnelles Zoomen oder 1.05 für langsameres Zoomen)
+        # adapt zoom-factor (p.e., 1.1 for fast zoom or 1.05 for slow zoom)
         zoom_factor = 0.9 if event.angleDelta().y() > 0 else 1.1
         self._camera_distance *= zoom_factor
-        self._camera_distance = max(1.0, min(100.0, self._camera_distance))  # Begrenze den Zoombereich
-        self.update()  # Bildschirm aktualisieren
+        self._camera_distance = max(1.0, min(100.0, self._camera_distance))  # bound zoom interval
+        self.update()  # update screen
 
 
 class MainWindow(QMainWindow):
