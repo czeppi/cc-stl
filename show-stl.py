@@ -55,7 +55,7 @@ FRAGMENT_SHADER_SRC = """
 
 class OpenGlWin(QOpenGLWidget):
 
-    def __init__(self, stl_path, parent: QWindow):
+    def __init__(self, stl_path: str, parent: QWindow):
         super().__init__()
         self._stl_path = stl_path
         self._mesh = None
@@ -72,7 +72,7 @@ class OpenGlWin(QOpenGLWidget):
         self._is_right_button_pressed = False
 
     def initializeGL(self):
-        self._mesh = trimesh.load(self._stl_path)
+        self._mesh = self._read_mesh(self._stl_path)
         vertex_data = self._create_vertex_data(self._mesh)
 
         self._shader_program = self._create_shader_program()
@@ -97,6 +97,18 @@ class OpenGlWin(QOpenGLWidget):
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
+        mesh = trimesh.load(stl_path)
+        self._rotate_mesh_90degree_around_x_axis(mesh)
+        return mesh
+
+    @staticmethod
+    def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
+        """ rotate mesh, so that z axis looks up instead of y axis
+        """
+        rot_mat = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+        mesh.apply_transform(rot_mat)
 
     @staticmethod
     def _create_vertex_data(mesh: trimesh.Trimesh) -> np.array:
@@ -176,8 +188,8 @@ class OpenGlWin(QOpenGLWidget):
         elevation_rad = np.radians(self._camera_elevation)
         azimuth_rad = np.radians(self._camera_azimuth)
         camera_x = self._camera_distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        camera_y = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
-        camera_z = self._camera_distance * np.sin(elevation_rad)
+        camera_y = self._camera_distance * np.sin(elevation_rad)
+        camera_z = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
 
         # set init shader program
         self._shader_program.setUniformValue("model", model_matrix)
@@ -222,13 +234,13 @@ class OpenGlWin(QOpenGLWidget):
         """
         # calc camera position with azimuth and elevation
         x = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.sin(np.radians(self._camera_azimuth))
-        y = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.cos(np.radians(self._camera_azimuth))
-        z = self._camera_distance * np.sin(np.radians(self._camera_elevation))
+        y = self._camera_distance * np.sin(np.radians(self._camera_elevation))
+        z = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.cos(np.radians(self._camera_azimuth))
 
         # camera view point and "up"-vector
         eye = np.array([x, y, z], dtype=np.float32)
         center = np.array([0, 0, 0], dtype=np.float32)
-        up = np.array([0, 0, 1], dtype=np.float32)
+        up = np.array([0, 1, 0], dtype=np.float32)
 
         # View-Matrix berechnen
         f = center - eye
@@ -238,9 +250,9 @@ class OpenGlWin(QOpenGLWidget):
         u = np.cross(f, s)
 
         return QMatrix4x4(
-            s[0], u[0], -f[0], -np.dot(s, eye),
-            s[1], u[1], -f[1], -np.dot(u, eye),
-            s[2], u[2], -f[2], np.dot(f, eye),
+            s[0], u[0], f[0], -np.dot(s, eye),
+            s[1], u[1], f[1], -np.dot(u, eye),
+            s[2], u[2], f[2], np.dot(f, eye),
             0, 0, 0, 1
         )
 
