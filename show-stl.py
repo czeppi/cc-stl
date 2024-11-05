@@ -48,7 +48,7 @@ FRAGMENT_SHADER_SRC = """
         float intensity = max(dot(viewDir, normal), 0.0);
         vec3 result = ambientColor * objectColor * intensity + 0.2;  // todo: offset is nor correct
 
-        fragColor = vec4(result, 1.0);
+        fragColor = vec4(result, 0.5);
     }
 """
 
@@ -72,40 +72,12 @@ class OpenGlWin(QOpenGLWidget):
         self._is_right_button_pressed = False
 
     def initializeGL(self):
-        glEnable(GL_DEPTH_TEST)
-
-        # read STL file
         self._mesh = trimesh.load(self._stl_path)
-        vertices = np.array(self._mesh.vertices, dtype=np.float32)
-        #vertices[:, [1, 2]] = vertices[:, [2, 1]]   # swap y and z, cause z should vertical axis
-        faces = np.array(self._mesh.faces, dtype=np.uint32)
+        vertex_data = self._create_vertex_data(self._mesh)
 
-        vertex_normals = np.array(self._mesh.vertex_normals, dtype=np.float32)
-        face_normals = np.array(self._mesh.face_normals, dtype=np.float32)
-
-        # combine positions and vertex_normals
-        vertex_data = np.hstack((vertices, vertex_normals)).astype(np.float32)
-
-        # variant for flat shading (homogenous colored triangles)
-        #face_normals = np.repeat(face_normals, 3, axis=0)  # repeat for every vertex per face
-        #faces_flatten = faces.flatten()
-        #vertex_data = np.hstack((vertices[faces.flatten()], face_normals)).astype(np.float32)  # for face normals instead of vertex normals
-
-        self._shader_program = QOpenGLShaderProgram(self)
-        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, VERTEX_SHADER_SRC)
-        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FRAGMENT_SHADER_SRC)
-        self._shader_program.link()
-
-        # create and init VBO und EBO
-        self._vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
-        self._vbo.create()
-        self._vbo.bind()
-        self._vbo.allocate(vertex_data.tobytes(), vertex_data.nbytes)
-
-        self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
-        self._ebo.create()
-        self._ebo.bind()
-        self._ebo.allocate(faces.tobytes(), faces.nbytes)
+        self._shader_program = self._create_shader_program()
+        self._vbo = self._create_vbo_buffer(vertex_data)
+        self._ebo = self._create_ebo_buffer(self._mesh)
 
         # init VAO
         self._vao = QOpenGLVertexArrayObject()
@@ -115,21 +87,70 @@ class OpenGlWin(QOpenGLWidget):
         self._ebo.bind()
         self._shader_program.bind()
 
-        pos_location = self._shader_program.attributeLocation("position")
-        norm_location = self._shader_program.attributeLocation("normal")
-        self._shader_program.enableAttributeArray(pos_location)
-        self._shader_program.enableAttributeArray(norm_location)
-        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 6 * vertex_data.itemsize, ctypes.c_void_p(0))
-        glVertexAttribPointer(norm_location, 3, GL_FLOAT, GL_FALSE, 6 * vertex_data.itemsize, ctypes.c_void_p(3 * vertex_data.itemsize))
-
-        # set light parameters
-        self._shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        self._shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+        self._init_shader_program(self._shader_program, vertex_data.itemsize)
 
         self._vao.release()
         self._vbo.release()
         self._ebo.release()
         self._shader_program.release()
+
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    @staticmethod
+    def _create_vertex_data(mesh: trimesh.Trimesh) -> np.array:
+        vertices = np.array(mesh.vertices, dtype=np.float32)
+        # vertices[:, [1, 2]] = vertices[:, [2, 1]]   # swap y and z, cause z should vertical axis
+
+        vertex_normals = np.array(mesh.vertex_normals, dtype=np.float32)
+        vertex_data = np.hstack((vertices, vertex_normals)).astype(np.float32)
+
+        # variant for flat shading (homogenous colored triangles)
+        # face_normals = np.array(self._mesh.face_normals, dtype=np.float32)
+        # face_normals = np.repeat(face_normals, 3, axis=0)  # repeat for every vertex per face
+        # faces_flatten = faces.flatten()
+        # vertex_data = np.hstack((vertices[faces.flatten()], face_normals)).astype(np.float32)  # for face normals instead of vertex normals
+
+        return vertex_data
+
+    def _create_shader_program(self) -> QOpenGLShaderProgram:
+        shader_program = QOpenGLShaderProgram(self)
+        shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, VERTEX_SHADER_SRC)
+        shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FRAGMENT_SHADER_SRC)
+        shader_program.link()
+        return shader_program
+
+    @staticmethod
+    def _init_shader_program(shader_program: QOpenGLShaderProgram, item_size: int) -> None:
+        pos_location = shader_program.attributeLocation("position")
+        norm_location = shader_program.attributeLocation("normal")
+        shader_program.enableAttributeArray(pos_location)
+        shader_program.enableAttributeArray(norm_location)
+        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(0))
+        glVertexAttribPointer(norm_location, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(3 * item_size))
+
+        # set light parameters
+        shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+
+    @staticmethod
+    def _create_vbo_buffer(vertex_data: np.array) -> QOpenGLBuffer:
+        vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
+        vbo.create()
+        vbo.bind()
+        vbo.allocate(vertex_data.tobytes(), vertex_data.nbytes)
+        return vbo
+
+    @staticmethod
+    def _create_ebo_buffer(mesh: trimesh.Trimesh) -> QOpenGLBuffer:
+        faces = np.array(mesh.faces, dtype=np.uint32)
+
+        ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
+        ebo.create()
+        ebo.bind()
+        ebo.allocate(faces.tobytes(), faces.nbytes)
+        return ebo
 
     def resizeGL(self, width, height):
         glViewport(0, 0, width, height)
