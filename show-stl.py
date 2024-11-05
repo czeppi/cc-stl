@@ -9,6 +9,50 @@ from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLBuffer, QOpenGLVertexA
 from OpenGL.GL import *
 
 
+VERTEX_SHADER_SRC = """
+    #version 330 core
+    layout(location = 0) in vec3 position;
+    layout(location = 1) in vec3 normal; 
+
+    uniform mat4 model;
+    uniform mat4 view;
+    uniform mat4 projection;
+
+    out vec3 fragNormal;
+    out vec3 fragPosition;
+
+    void main() {
+        // fragPosition = vec3(model * vec4(position, 1.0));
+        // fragNormal = mat3(transpose(inverse(model))) * normal;
+        fragPosition = position;
+        fragNormal = vec3(normal);
+        
+        gl_Position = projection * view * vec4(fragPosition, 1.0);
+    }
+"""
+
+FRAGMENT_SHADER_SRC = """
+    #version 330 core
+    in vec3 fragNormal;
+    in vec3 fragPosition;
+
+    uniform vec3 ambientColor;    // Umgebungslichtfarbe
+    uniform vec3 cameraPos;
+    uniform vec3 objectColor; 
+
+    out vec4 fragColor;
+
+    void main() {
+        vec3 normal = normalize(fragNormal);
+        vec3 viewDir = normalize(cameraPos - fragPosition);
+        float intensity = max(dot(viewDir, normal), 0.0);
+        vec3 result = ambientColor * objectColor * intensity + 0.2;  // todo: offset is nor correct
+
+        fragColor = vec4(result, 1.0);
+    }
+"""
+
+
 class OpenGlWin(QOpenGLWidget):
 
     def __init__(self, stl_path, parent: QWindow):
@@ -34,102 +78,34 @@ class OpenGlWin(QOpenGLWidget):
         self._mesh = trimesh.load(self._stl_path)
         vertices = np.array(self._mesh.vertices, dtype=np.float32)
         #vertices[:, [1, 2]] = vertices[:, [2, 1]]   # swap y and z, cause z should vertical axis
-        normals = np.array(self._mesh.vertex_normals, dtype=np.float32)
         faces = np.array(self._mesh.faces, dtype=np.uint32)
 
-        # combine positions and normals
-        vertex_data = np.hstack((vertices, normals)).astype(np.float32)
+        vertex_normals = np.array(self._mesh.vertex_normals, dtype=np.float32)
+        face_normals = np.array(self._mesh.face_normals, dtype=np.float32)
 
-        # create shader-program
-        vertex_src = """
-            #version 330 core
-            layout(location = 0) in vec3 position;
-            layout(location = 1) in vec3 normal; 
-            
-            uniform mat4 model;
-            uniform mat4 view;
-            uniform mat4 projection;
-            
-            out vec3 fragNormal;
-            out vec3 fragPosition;
-            
-            void main() {
-                fragPosition = vec3(model * vec4(position, 1.0));
-                fragNormal = mat3(transpose(inverse(model))) * normal;
-                // gl_Position = projection * view * model * vec4(position, 1.0);
-                gl_Position = projection * view * vec4(fragPosition, 1.0);
-            }
-        """
+        # combine positions and vertex_normals
+        vertex_data = np.hstack((vertices, vertex_normals)).astype(np.float32)
 
-        fragment_src = """
-            #version 330 core
-            in vec3 fragNormal;
-            in vec3 fragPosition;
-            
-            uniform vec3 ambientColor;    // Umgebungslichtfarbe
-            uniform vec3 cameraPos;
-            uniform vec3 objectColor; 
-            
-            out vec4 fragColor;
+        # variant for flat shading (homogenous colored triangles)
+        #face_normals = np.repeat(face_normals, 3, axis=0)  # repeat for every vertex per face
+        #faces_flatten = faces.flatten()
+        #vertex_data = np.hstack((vertices[faces.flatten()], face_normals)).astype(np.float32)  # for face normals instead of vertex normals
 
-            void main() {
-                // normalize of the normals
-                vec3 normal = normalize(fragNormal);
-                
-                // calc direction between camera and fragment position
-                vec3 viewDir = normalize(cameraPos - fragPosition);
-                
-                // angle bases ambient light
-                float intensity = max(dot(viewDir, normal), 0.0);
-                
-                // calc result color
-                vec3 result = ambientColor * objectColor * intensity + 0.2;
-                
-                fragColor = vec4(result, 1.0);
-            }
-        """
-
-        # fragment_src = """
-        #     #version 330 core
-        #     out vec4 fragColor;
-        #
-        #     // Konstanten für Beleuchtung
-        #     uniform vec3 ambientColor;    // Umgebungslichtfarbe
-        #     uniform vec3 lightPosition;   // Position der Lichtquelle
-        #     uniform vec3 lightColor;      // Farbe des Lichts
-        #     uniform vec3 objectColor;     // Farbe des Objekts
-        #
-        #     void main() {
-        #         // Umgebungslichtanteil
-        #         vec3 ambient = ambientColor;
-        #
-        #         // Diffusanteil basierend auf Lichtposition (vereinfachtes Lichtmodell)
-        #         vec3 lightDir = normalize(lightPosition - vec3(0.0, 0.0, 0.0)); // Licht in Richtung Ursprung
-        #         float diff = max(dot(vec3(0.0, 0.0, 1.0), lightDir), 0.0);  // Diffuslicht entlang der Normalen
-        #         vec3 diffuse = diff * lightColor;
-        #
-        #         // Kombination von Umgebungs- und Diffuslicht
-        #         vec3 result = (ambient + diffuse) * objectColor;
-        #         //fragColor = vec4(result, 1.0);
-        #         fragColor = vec4(0.6, 0.6, 0.8, 1.0);
-        # """
         self._shader_program = QOpenGLShaderProgram(self)
-        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, vertex_src)
-        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, fragment_src)
+        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, VERTEX_SHADER_SRC)
+        self._shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FRAGMENT_SHADER_SRC)
         self._shader_program.link()
 
         # create and init VBO und EBO
         self._vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
         self._vbo.create()
         self._vbo.bind()
-        vertices_as_bytes = vertices.tobytes()
-        self._vbo.allocate(vertices_as_bytes, len(vertices_as_bytes))
+        self._vbo.allocate(vertex_data.tobytes(), vertex_data.nbytes)
 
         self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
         self._ebo.create()
         self._ebo.bind()
-        faces_as_bytes = faces.tobytes()
-        self._ebo.allocate(faces_as_bytes, len(faces_as_bytes))
+        self._ebo.allocate(faces.tobytes(), faces.nbytes)
 
         # init VAO
         self._vao = QOpenGLVertexArrayObject()
@@ -143,14 +119,11 @@ class OpenGlWin(QOpenGLWidget):
         norm_location = self._shader_program.attributeLocation("normal")
         self._shader_program.enableAttributeArray(pos_location)
         self._shader_program.enableAttributeArray(norm_location)
-        #glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 0, None)
-        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 6 * 4, None)
-        glVertexAttribPointer(norm_location, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(3 * 4))
+        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 6 * vertex_data.itemsize, ctypes.c_void_p(0))
+        glVertexAttribPointer(norm_location, 3, GL_FLOAT, GL_FALSE, 6 * vertex_data.itemsize, ctypes.c_void_p(3 * vertex_data.itemsize))
 
         # set light parameters
         self._shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        #self._shader_program.setUniformValue("lightPosition", QVector3D(100.0, 100.0, 100.0))  # position of the light source
-        #self._shader_program.setUniformValue("lightColor", QVector3D(0.8, 0.8, 0.8))  # white light
         self._shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
 
         self._vao.release()
