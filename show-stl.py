@@ -33,41 +33,58 @@ class OpenGlWin(QOpenGLWidget):
         # read STL file
         self._mesh = trimesh.load(self._stl_path)
         vertices = np.array(self._mesh.vertices, dtype=np.float32)
-        vertices[:, [1, 2]] = vertices[:, [2, 1]]   # swap y and z, cause z should vertical axis
+        #vertices[:, [1, 2]] = vertices[:, [2, 1]]   # swap y and z, cause z should vertical axis
+        normals = np.array(self._mesh.vertex_normals, dtype=np.float32)
         faces = np.array(self._mesh.faces, dtype=np.uint32)
+
+        # combine positions and normals
+        vertex_data = np.hstack((vertices, normals)).astype(np.float32)
 
         # create shader-program
         vertex_src = """
             #version 330 core
             layout(location = 0) in vec3 position;
+            layout(location = 1) in vec3 normal; 
+            
             uniform mat4 model;
             uniform mat4 view;
             uniform mat4 projection;
+            
+            out vec3 fragNormal;
+            out vec3 fragPosition;
+            
             void main() {
-                gl_Position = projection * view * model * vec4(position, 1.0);
+                fragPosition = vec3(model * vec4(position, 1.0));
+                fragNormal = mat3(transpose(inverse(model))) * normal;
+                // gl_Position = projection * view * model * vec4(position, 1.0);
+                gl_Position = projection * view * vec4(fragPosition, 1.0);
             }
         """
 
         fragment_src = """
             #version 330 core
-            out vec4 fragColor;
+            in vec3 fragNormal;
+            in vec3 fragPosition;
             
             uniform vec3 ambientColor;    // Umgebungslichtfarbe
-            uniform vec3 lightPosition;   // position of the light source
-            uniform vec3 lightColor;      // color of light source
+            uniform vec3 cameraPos;
             uniform vec3 objectColor; 
             
+            out vec4 fragColor;
+
             void main() {
-                vec3 ambient = ambientColor;
+                // normalize of the normals
+                vec3 normal = normalize(fragNormal);
                 
-                // Diffusanteil basierend auf Lichtposition (vereinfachtes Lichtmodell)
-                vec3 lightDir = normalize(lightPosition - vec3(0.0, 0.0, 0.0)); // Licht in Richtung Ursprung
-                float diff = max(dot(vec3(0.0, 0.0, 1.0), lightDir), 0.0);  // Diffuslicht entlang der Normalen
-                vec3 diffuse = diff * lightColor;
+                // calc direction between camera and fragment position
+                vec3 viewDir = normalize(cameraPos - fragPosition);
                 
-                vec3 result = (ambient + diffuse) * objectColor;
+                // angle bases ambient light
+                float intensity = max(dot(viewDir, normal), 0.0);
                 
-                // fragColor = vec4(0.6, 0.6, 0.8, 1.0);
+                // calc result color
+                vec3 result = ambientColor * objectColor * intensity + 0.2;
+                
                 fragColor = vec4(result, 1.0);
             }
         """
@@ -123,13 +140,17 @@ class OpenGlWin(QOpenGLWidget):
         self._shader_program.bind()
 
         pos_location = self._shader_program.attributeLocation("position")
+        norm_location = self._shader_program.attributeLocation("normal")
         self._shader_program.enableAttributeArray(pos_location)
-        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 0, None)
+        self._shader_program.enableAttributeArray(norm_location)
+        #glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 6 * 4, None)
+        glVertexAttribPointer(norm_location, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(3 * 4))
 
         # set light parameters
-        self._shader_program.setUniformValue("ambientColor", QVector3D(0.2, 0.2, 0.2))  # Gedimmtes Umgebungslicht
-        self._shader_program.setUniformValue("lightPosition", QVector3D(100.0, 100.0, 100.0))  # position of the light source
-        self._shader_program.setUniformValue("lightColor", QVector3D(0.8, 0.8, 0.8))  # white light
+        self._shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        #self._shader_program.setUniformValue("lightPosition", QVector3D(100.0, 100.0, 100.0))  # position of the light source
+        #self._shader_program.setUniformValue("lightColor", QVector3D(0.8, 0.8, 0.8))  # white light
         self._shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
 
         self._vao.release()
@@ -154,12 +175,21 @@ class OpenGlWin(QOpenGLWidget):
         self._vao.bind()
 
         # use transformation
+        #model_matrix = self._create_translation_matrix(0, 0, -30)
         model_matrix = self._create_eye_matrix()
-
         view_matrix = self._calculate_view_matrix()
 
+        # calc camera position
+        elevation_rad = np.radians(self._camera_elevation)
+        azimuth_rad = np.radians(self._camera_azimuth)
+        camera_x = self._camera_distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+        camera_y = self._camera_distance * np.sin(elevation_rad)
+        camera_z = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+
+        # set init shader program
         self._shader_program.setUniformValue("model", model_matrix)
         self._shader_program.setUniformValue("view", view_matrix)
+        self._shader_program.setUniformValue("cameraPos", QVector3D(camera_x, camera_y, camera_z))
 
         glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
 
