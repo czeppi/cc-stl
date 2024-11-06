@@ -9,7 +9,7 @@ from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLBuffer, QOpenGLVertexA
 from OpenGL.GL import *
 
 
-VERTEX_SHADER_SRC = """
+FACES_VERTEX_SHADER_SRC = """
     #version 330 core
     layout(location = 0) in vec3 position;
     layout(location = 1) in vec3 normal; 
@@ -31,7 +31,7 @@ VERTEX_SHADER_SRC = """
     }
 """
 
-FRAGMENT_SHADER_SRC = """
+FACES_FRAGMENT_SHADER_SRC = """
     #version 330 core
     in vec3 fragNormal;
     in vec3 fragPosition;
@@ -57,9 +57,8 @@ class OpenGlWin(QOpenGLWidget):
 
     def __init__(self, stl_path: str, parent: QWindow):
         super().__init__()
-        self._stl_path = stl_path
-        self._mesh = None
-        self._shader_program = None
+        self._mesh = self._read_mesh(stl_path)
+        self._faces_shader_program = QOpenGLShaderProgram()
         self._vbo = None
         self._ebo = None
         self._vao = None
@@ -71,11 +70,30 @@ class OpenGlWin(QOpenGLWidget):
         self._last_mouse_position = QPoint()
         self._is_right_button_pressed = False
 
+    def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
+        mesh = trimesh.load(stl_path)
+        self._rotate_mesh_90degree_around_x_axis(mesh)
+        return mesh
+
+    def _create_shader_program(self) -> QOpenGLShaderProgram:
+        shader_program = QOpenGLShaderProgram(self)
+        shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, FACES_VERTEX_SHADER_SRC)
+        shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FACES_FRAGMENT_SHADER_SRC)
+        shader_program.link()
+        return shader_program
+
+    @staticmethod
+    def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
+        """ rotate mesh, so that z axis looks up instead of y axis
+        """
+        rot_mat = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+        mesh.apply_transform(rot_mat)
+
     def initializeGL(self):
-        self._mesh = self._read_mesh(self._stl_path)
+        self._faces_shader_program = self._create_shader_program()
+
         vertex_data = self._create_vertex_data(self._mesh)
 
-        self._shader_program = self._create_shader_program()
         self._vbo = self._create_vbo_buffer(vertex_data)
         self._ebo = self._create_ebo_buffer(self._mesh)
 
@@ -85,30 +103,18 @@ class OpenGlWin(QOpenGLWidget):
         self._vao.bind()
         self._vbo.bind()
         self._ebo.bind()
-        self._shader_program.bind()
+        self._faces_shader_program.bind()
 
-        self._init_shader_program(self._shader_program, vertex_data.itemsize)
+        self._init_shader_program(self._faces_shader_program, vertex_data.itemsize)
 
         self._vao.release()
         self._vbo.release()
         self._ebo.release()
-        self._shader_program.release()
+        self._faces_shader_program.release()
 
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-    def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
-        mesh = trimesh.load(stl_path)
-        self._rotate_mesh_90degree_around_x_axis(mesh)
-        return mesh
-
-    @staticmethod
-    def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
-        """ rotate mesh, so that z axis looks up instead of y axis
-        """
-        rot_mat = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
-        mesh.apply_transform(rot_mat)
 
     @staticmethod
     def _create_vertex_data(mesh: trimesh.Trimesh) -> np.array:
@@ -125,13 +131,6 @@ class OpenGlWin(QOpenGLWidget):
         # vertex_data = np.hstack((vertices[faces.flatten()], face_normals)).astype(np.float32)  # for face normals instead of vertex normals
 
         return vertex_data
-
-    def _create_shader_program(self) -> QOpenGLShaderProgram:
-        shader_program = QOpenGLShaderProgram(self)
-        shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, VERTEX_SHADER_SRC)
-        shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FRAGMENT_SHADER_SRC)
-        shader_program.link()
-        return shader_program
 
     @staticmethod
     def _init_shader_program(shader_program: QOpenGLShaderProgram, item_size: int) -> None:
@@ -170,14 +169,14 @@ class OpenGlWin(QOpenGLWidget):
         aspect_ratio = width / height
         projection_matrix = self._create_perspective_matrix(45.0, aspect_ratio, 0.1, 100.0)
 
-        self._shader_program.bind()
-        self._shader_program.setUniformValue("projection", projection_matrix)
-        self._shader_program.release()
+        self._faces_shader_program.bind()
+        self._faces_shader_program.setUniformValue("projection", projection_matrix)
+        self._faces_shader_program.release()
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self._shader_program.bind()
+        self._faces_shader_program.bind()
         self._vao.bind()
 
         # use transformation
@@ -192,14 +191,14 @@ class OpenGlWin(QOpenGLWidget):
         camera_z = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
 
         # set init shader program
-        self._shader_program.setUniformValue("model", model_matrix)
-        self._shader_program.setUniformValue("view", view_matrix)
-        self._shader_program.setUniformValue("cameraPos", QVector3D(camera_x, camera_y, camera_z))
+        self._faces_shader_program.setUniformValue("model", model_matrix)
+        self._faces_shader_program.setUniformValue("view", view_matrix)
+        self._faces_shader_program.setUniformValue("cameraPos", QVector3D(camera_x, camera_y, camera_z))
 
         glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
 
         self._vao.release()
-        self._shader_program.release()
+        self._faces_shader_program.release()
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
