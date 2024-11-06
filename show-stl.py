@@ -1,4 +1,7 @@
 import sys
+from dataclasses import dataclass
+from typing import Tuple
+
 import trimesh
 import numpy as np
 from PySide6.QtCore import Qt, QPoint
@@ -46,7 +49,7 @@ FACES_FRAGMENT_SHADER_SRC = """
         float intensity = max(dot(viewDir, normal), 0.0);
         vec3 result = ambientColor * objectColor * intensity + 0.2;  // todo: offset is nor correct
 
-        fragColor = vec4(result, 0.5);
+        fragColor = vec4(result, 1);
     }
 """
 
@@ -86,9 +89,51 @@ VERTICES_FRAGMENT_SHADER_SRC = """
     #version 330
     out vec4 fragColor;
     void main() {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);  // selected color for vertices
+        fragColor = vec4(0.0, 0.0, 1.0, 1.0);  // selected color for vertices
     }
 """
+
+
+@dataclass
+class Camera:
+
+    def __init__(self, distance: float, azimuth: float, elevation: float):
+        self.distance = distance
+        self._azimuth = azimuth
+        self._elevation = elevation
+
+    @property
+    def distance(self) -> float:
+        return self._distance
+
+    @distance.setter
+    def distance(self, value: float) -> None:
+        self._distance = max(1.0, min(100.0, value))  # bound zoom interval
+
+    @property
+    def azimuth(self) -> float:
+        return self._azimuth
+
+    @azimuth.setter
+    def azimuth(self, value: float) -> None:
+        self._azimuth = value
+
+    @property
+    def elevation(self) -> float:
+        return self._elevation
+
+    @elevation.setter
+    def elevation(self, value: float) -> None:
+        self._elevation = max(-89.0, min(89.0, value))
+
+    @property
+    def xyz(self) -> Tuple[float, float, float]:
+        elevation_rad = np.radians(self.elevation)
+        azimuth_rad = np.radians(self.azimuth)
+        x = self.distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+        y = self.distance * np.sin(elevation_rad)
+        z = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        return x, y, z
 
 
 class OpenGlWin(QOpenGLWidget):
@@ -105,10 +150,8 @@ class OpenGlWin(QOpenGLWidget):
 
         self._projection_matrix = QMatrix4x4()
 
-        # Kamera-Parameter
-        self._camera_distance = 50.0  # start zoom distance
-        self._camera_azimuth = 0.0  # horizontal angle in degree
-        self._camera_elevation = 0.0  # vertical angle in degree
+        # camera
+        self._camera = Camera(distance=50.0, azimuth=0.0, elevation=0.0)
         self._last_mouse_position = QPoint()
         self._is_right_button_pressed = False
 
@@ -247,17 +290,10 @@ class OpenGlWin(QOpenGLWidget):
         view_matrix = self._calculate_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
-        # calc camera position
-        elevation_rad = np.radians(self._camera_elevation)
-        azimuth_rad = np.radians(self._camera_azimuth)
-        camera_x = self._camera_distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        camera_y = self._camera_distance * np.sin(elevation_rad)
-        camera_z = self._camera_distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
-
         # paint faces
         self._faces_shader_program.bind()
         self._faces_shader_program.setUniformValue("mvp_matrix", mvp_matrix)
-        self._faces_shader_program.setUniformValue("cameraPos", QVector3D(camera_x, camera_y, camera_z))
+        self._faces_shader_program.setUniformValue("cameraPos", QVector3D(*self._camera.xyz))
         self._vao.bind()
 
         glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
@@ -266,18 +302,19 @@ class OpenGlWin(QOpenGLWidget):
         self._faces_shader_program.release()
 
         # paint edges
-        glDepthMask(GL_FALSE)  # depth buffer writing deactivate
+        #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
+        glEnable(GL_POLYGON_OFFSET_LINE)  # no effect
+        glPolygonOffset(-1.0, -1.0)  # no effect
         glLineWidth(2.0)
 
         self._edges_shader_program.bind()
         self._edges_shader_program.setUniformValue("mvp_matrix", mvp_matrix)
         self._vao.bind()
 
-        glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)
+        #glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)
 
         self._vao.release()
         self._edges_shader_program.release()
-        glDepthMask(GL_TRUE)  # depth buffer writing reactivate
 
         # paint vertices
         glPointSize(5.0)
@@ -289,6 +326,9 @@ class OpenGlWin(QOpenGLWidget):
 
         self._vao.release()
         self._edges_shader_program.release()
+
+        glDisable(GL_POLYGON_OFFSET_LINE)
+        #glDepthMask(GL_TRUE)  # depth buffer writing reactivate
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
@@ -321,13 +361,8 @@ class OpenGlWin(QOpenGLWidget):
     def _calculate_view_matrix(self) -> QMatrix4x4:
         """ cals view matrix in dependency of the camera
         """
-        # calc camera position with azimuth and elevation
-        x = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.sin(np.radians(self._camera_azimuth))
-        y = self._camera_distance * np.sin(np.radians(self._camera_elevation))
-        z = self._camera_distance * np.cos(np.radians(self._camera_elevation)) * np.cos(np.radians(self._camera_azimuth))
-
         # camera view point and "up"-vector
-        eye = np.array([x, y, z], dtype=np.float32)
+        eye = np.array(self._camera.xyz, dtype=np.float32)
         center = np.array([0, 0, 0], dtype=np.float32)
         up = np.array([0, 1, 0], dtype=np.float32)
 
@@ -357,11 +392,8 @@ class OpenGlWin(QOpenGLWidget):
     def mouseMoveEvent(self, event):
         if self._is_right_button_pressed:
             delta = event.position().toPoint() - self._last_mouse_position
-            self._camera_azimuth += delta.x() * 0.25  # sensitivity for azimuth
-            self._camera_elevation += delta.y() * 0.25  # sensitivity for elevation
-
-            # bound elevation
-            self._camera_elevation = max(-89.0, min(89.0, self._camera_elevation))
+            self._camera.azimuth += delta.x() * 0.25  # sensitivity for azimuth
+            self._camera.elevation += delta.y() * 0.25  # sensitivity for elevation
 
             self._last_mouse_position = event.position().toPoint()
             self.update()  # update screen
@@ -369,8 +401,7 @@ class OpenGlWin(QOpenGLWidget):
     def wheelEvent(self, event):
         # adapt zoom-factor (p.e., 1.1 for fast zoom or 1.05 for slow zoom)
         zoom_factor = 0.9 if event.angleDelta().y() > 0 else 1.1
-        self._camera_distance *= zoom_factor
-        self._camera_distance = max(1.0, min(100.0, self._camera_distance))  # bound zoom interval
+        self._camera.distance *= zoom_factor
         self.update()  # update screen
 
 
