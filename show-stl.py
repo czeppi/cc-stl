@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Optional
 
 import trimesh
 import numpy as np
@@ -144,9 +144,13 @@ class OpenGlWin(QOpenGLWidget):
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = QOpenGLShaderProgram()
-        self._faces_vbo = None
-        self._faces_ebo = None
-        self._faces_vao = None
+        self._positions_vbo: Optional[QOpenGLBuffer] = None
+        self._normals_vbo: Optional[QOpenGLBuffer] = None
+        self._faces_ebo: Optional[QOpenGLBuffer] = None
+
+        self._faces_vao: Optional[QOpenGLVertexArrayObject] = None
+        self._edges_vao: Optional[QOpenGLVertexArrayObject] = None
+        self._vertices_vao: Optional[QOpenGLVertexArrayObject] = None
 
         self._projection_matrix = QMatrix4x4()
 
@@ -174,7 +178,9 @@ class OpenGlWin(QOpenGLWidget):
 
         vertices_data = self._create_vertices_data(self._mesh)
 
-        self._faces_vbo = self._create_faces_vbo_buffer(vertices_data)
+        self._positions_vbo = self._create_positions_vbo_buffer(np.array(self._mesh.vertices, dtype=np.float32))
+        #self._normals_vbo = self._create_faces_vbo_buffer(vertices_data)
+        self._normals_vbo = self._create_normals_vbo_buffer(np.array(self._mesh.vertex_normals, dtype=np.float32))
         self._faces_ebo = self._create_faces_ebo_buffer(self._mesh)
         self._edges_ebe = self._create_edges_ebo_buffer(self._edges_array)
 
@@ -226,23 +232,44 @@ class OpenGlWin(QOpenGLWidget):
         self._faces_vao = QOpenGLVertexArrayObject()
         self._faces_vao.create()
         self._faces_vao.bind()
-        self._faces_vbo.bind()
-        self._faces_ebo.bind()
-        self._faces_shader_program.bind()
 
+        self._positions_vbo.bind()
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        self._normals_vbo.bind()
+        #glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(3 * item_size))
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        self._faces_ebo.bind()
+
+        self._faces_shader_program.bind()
         self._faces_shader_program.enableAttributeArray(0)
         self._faces_shader_program.enableAttributeArray(1)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(0))
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(3 * item_size))
 
         # set light parameters
         self._faces_shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
         self._faces_shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
 
         self._faces_vao.release()
-        self._faces_vbo.release()
+        self._normals_vbo.release()
         self._faces_ebo.release()
+        self._positions_vbo.release()
         self._faces_shader_program.release()
+
+    def _init_edges_shader_program(self) -> None:
+        self._edges_vao = QOpenGLVertexArrayObject()
+        self._edges_vao.create()
+
+        self._edges_shader_program.bind()
+        self._edges_vao.bind()
+        self._positions_vbo.bind()
+
+        self._edges_shader_program.enableAttributeArray(0)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(0))
+
+        self._positions_vbo.release()
+        self._edges_vao.release()
+        self._edges_shader_program.release()
 
     def _init_vertices_shader_program(self) -> None:
         self._vertices_vao = QOpenGLVertexArrayObject()
@@ -250,14 +277,34 @@ class OpenGlWin(QOpenGLWidget):
 
         self._vertices_shader_program.bind()
         self._vertices_vao.bind()
-        self._faces_vbo.bind()
+        self._positions_vbo.bind()
 
         self._vertices_shader_program.enableAttributeArray(0)
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(0))
 
-        self._faces_vbo.release()
+        self._positions_vbo.release()
         self._vertices_vao.release()
         self._vertices_shader_program.release()
+
+    @staticmethod
+    def _create_positions_vbo_buffer(vertices: np.array) -> QOpenGLBuffer:
+        vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
+        vbo.create()
+        vbo.bind()
+        vbo.setUsagePattern(QOpenGLBuffer.StaticDraw)
+        vbo.allocate(vertices.tobytes(), vertices.nbytes)
+        vbo.release()
+        return vbo
+
+    @staticmethod
+    def _create_normals_vbo_buffer(vertices: np.array) -> QOpenGLBuffer:
+        vbo = QOpenGLBuffer(QOpenGLBuffer.VertexBuffer)
+        vbo.create()
+        vbo.bind()
+        vbo.setUsagePattern(QOpenGLBuffer.StaticDraw)
+        vbo.allocate(vertices.tobytes(), vertices.nbytes)
+        vbo.release()
+        return vbo
 
     @staticmethod
     def _create_faces_vbo_buffer(vertices_data: np.array) -> QOpenGLBuffer:
