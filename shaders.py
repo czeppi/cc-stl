@@ -4,9 +4,8 @@ from typing import Optional
 
 import numpy as np
 import trimesh
-from OpenGL.GL import glVertexAttribPointer, glDrawElements
-from OpenGL.raw.GL.VERSION.GL_1_0 import GL_TRIANGLES, glPointSize, GL_POINTS
-from OpenGL.raw.GL._types import GL_FLOAT, GL_FALSE, GL_UNSIGNED_INT
+from OpenGL.GL import *
+
 from PySide6.QtGui import QVector3D
 
 from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLShader, QOpenGLVertexArrayObject, QOpenGLBuffer
@@ -50,7 +49,7 @@ FACES_FRAGMENT_SHADER_SRC = """
         float intensity = max(dot(viewDir, normal), 0.0);
         vec3 result = ambientColor * objectColor * intensity + 0.2;  // todo: offset is nor correct
 
-        fragColor = vec4(result, 1);
+        fragColor = vec4(result, 0.5);
     }
 """
 
@@ -180,6 +179,63 @@ class EdgesShaderProgram(ShaderProgram):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__(vertex_shader_src=EDGES_VERTEX_SHADER_SRC, fragment_shader_src=EDGES_FRAGMENT_SHADER_SRC)
         self._mesh = mesh
+        self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)
+
+        self._vao = QOpenGLVertexArrayObject()
+        self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
+
+    def init(self, positions_vbo: QOpenGLBuffer) -> None:
+        prg = self._gl_program
+        vao = self._vao = QOpenGLVertexArrayObject()
+        ebo = self._ebo = self._create_ebo()
+
+        vao.create()
+        vao.bind()
+
+        positions_vbo.bind()
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        ebo.bind()
+
+        prg.bind()
+        prg.enableAttributeArray(0)
+
+        vao.release()
+        ebo.release()
+        positions_vbo.release()
+        prg.release()
+
+    def _create_ebo(self) -> QOpenGLBuffer:
+        edges = self._edges_array
+
+        ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
+        ebo.create()
+        ebo.bind()
+        ebo.setUsagePattern(QOpenGLBuffer.StaticDraw)
+        ebo.allocate(edges.tobytes(), edges.nbytes)
+        ebo.release()
+        return ebo
+
+    def paint(self, mvp_matrix: np.array) -> None:
+        prg = self._gl_program
+        vao = self._vao
+
+        #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
+        #glEnable(GL_POLYGON_OFFSET_LINE)  # no effect
+        #glPolygonOffset(-1.0, -1.0)  # no effect
+        glLineWidth(2.0)
+
+        prg.bind()
+        prg.setUniformValue("mvp_matrix", mvp_matrix)
+        vao.bind()
+
+        glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)
+
+        vao.release()
+        prg.release()
+
+        #glDepthMask(GL_TRUE)  # depth buffer writing reactivate
+        #glDisable(GL_POLYGON_OFFSET_LINE)
 
 
 class VerticesShaderProgram(ShaderProgram):
