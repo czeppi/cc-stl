@@ -1,19 +1,19 @@
 from __future__ import annotations
+
 import sys
 from typing import Optional
 
-import trimesh
 import numpy as np
+import trimesh
+from OpenGL.GL import *
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QMatrix4x4, QWindow
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtOpenGL import QOpenGLBuffer
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
-from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLBuffer, QOpenGLVertexArrayObject, QOpenGLShader
-from OpenGL.GL import *
+from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
-from shaders import EDGES_VERTEX_SHADER_SRC, EDGES_FRAGMENT_SHADER_SRC, \
-    FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
+from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 
 class OpenGlWin(QOpenGLWidget):
@@ -33,7 +33,7 @@ class OpenGlWin(QOpenGLWidget):
         self._projection_matrix = QMatrix4x4()
 
         # camera
-        self._camera = Camera(distance=50.0, azimuth=0.0, elevation=0.0)
+        self._camera = Camera(distance=50.0, azimuth=180.0, elevation=45.0)
         self._last_mouse_position = QPoint()
         self._is_right_button_pressed = False
 
@@ -97,12 +97,39 @@ class OpenGlWin(QOpenGLWidget):
         # mvp_matrix
         model_matrix = self._create_eye_matrix()
         view_matrix = self._calculate_view_matrix()
+        view_matrix2 = self._calculate_view_matrix_new()
+        print(f'xyz={self._camera.xyz}')
+        print(f'    old={self._mat4_str(view_matrix)}')
+        print(f'    new={self._mat4_str(view_matrix2)}')
+
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
         self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
         #self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
+
+    def _mat4_str(self, m):
+        parts = [f'{v:.03f}' for v in self._mat4_items(m)]
+        return ', '.join(parts)
+
+    def _mat4_items(self, m):
+        yield m[0,0]
+        yield m[0,1]
+        yield m[0,2]
+        yield m[0,3]
+        yield m[1,0]
+        yield m[1,1]
+        yield m[1,2]
+        yield m[1,3]
+        yield m[2,0]
+        yield m[2,1]
+        yield m[2,2]
+        yield m[2,3]
+        yield m[3,0]
+        yield m[3,1]
+        yield m[3,2]
+        yield m[3,3]
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
@@ -132,27 +159,59 @@ class OpenGlWin(QOpenGLWidget):
             0, 0, 0, 1
         )
 
+    def _calculate_view_matrix_new(self) -> QMatrix4x4:
+        """ cals view matrix in dependency of the camera
+        """
+        eye = np.array(self._camera.xyz, dtype=np.float32)
+        up_vector = np.array([0, 1, 0], dtype=np.float32)
+
+        z_axis = 1 * eye
+        z_axis /= np.linalg.norm(z_axis)
+
+        x_axis = np.cross(up_vector, z_axis)
+        x_axis /= np.linalg.norm(x_axis)
+
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis /= np.linalg.norm(y_axis)
+
+        view_matrix = np.identity(4)
+        view_matrix[0, :3] = x_axis
+        view_matrix[1, :3] = y_axis
+        view_matrix[2, :3] = z_axis
+        view_matrix[:3, 3] = -eye @ np.array([x_axis, y_axis, z_axis])
+
+        view_matrix_flatten = view_matrix.flatten()
+        m = QMatrix4x4(*view_matrix_flatten)
+        return m
+
     def _calculate_view_matrix(self) -> QMatrix4x4:
         """ cals view matrix in dependency of the camera
         """
-        # camera view point and "up"-vector
         eye = np.array(self._camera.xyz, dtype=np.float32)
-        center = np.array([0, 0, 0], dtype=np.float32)
-        up = np.array([0, 1, 0], dtype=np.float32)
+        up_vector = np.array([0, 1, 0], dtype=np.float32)
 
-        # View-Matrix berechnen
-        f = center - eye
-        f /= np.linalg.norm(f)
-        s = np.cross(up, f)
-        s /= np.linalg.norm(s)
-        u = np.cross(f, s)
+        z_axis = 1 * eye
+        z_axis /= np.linalg.norm(z_axis)
 
-        return QMatrix4x4(
-            s[0], u[0], f[0], -np.dot(s, eye),
-            s[1], u[1], f[1], -np.dot(u, eye),
-            s[2], u[2], f[2], np.dot(f, eye),
+        x_axis = np.cross(up_vector, z_axis)
+        x_axis /= np.linalg.norm(x_axis)
+
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis /= np.linalg.norm(y_axis)
+
+        # m = QMatrix4x4(
+        #     x_axis[0], y_axis[0], z_axis[0], -np.dot(x_axis, eye),
+        #     x_axis[1], y_axis[1], z_axis[1], -np.dot(y_axis, eye),
+        #     x_axis[2], y_axis[2], z_axis[2], -np.dot(z_axis, eye),
+        #     0, 0, 0, 1
+        # )
+        m = QMatrix4x4(
+            x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye),
+            y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
+            z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye),
             0, 0, 0, 1
         )
+        return m
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -166,8 +225,14 @@ class OpenGlWin(QOpenGLWidget):
     def mouseMoveEvent(self, event):
         if self._is_right_button_pressed:
             delta = event.position().toPoint() - self._last_mouse_position
-            self._camera.azimuth += delta.x() * 0.25  # sensitivity for azimuth
-            self._camera.elevation += delta.y() * 0.25  # sensitivity for elevation
+            d_azimuth = -delta.x() * 0.25  # sensitivity for azimuth
+            d_elevation = delta.y() * 0.25  # sensitivity for elevation
+
+            self._camera.azimuth += d_azimuth
+            #self._camera.rotate_vertical(d_elevation)
+            self._camera.elevation += d_elevation
+            x, y, z = self._camera.xyz
+            #print(f'elevation: {self._camera._elevation}, y: {y}')
 
             self._last_mouse_position = event.position().toPoint()
             self.update()  # update screen
