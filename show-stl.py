@@ -143,24 +143,33 @@ class ShaderProgram:
         self._fragment_shader_src = fragment_shader_src
         self._gl_program: Optional[QOpenGLShaderProgram] = None
 
-    def compile(self) -> None:
-        self._gl_program = QOpenGLShaderProgram()
-        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, FACES_VERTEX_SHADER_SRC)
-        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FACES_FRAGMENT_SHADER_SRC)
-        self._gl_program.link()
+    @staticmethod
+    def link(vertex_shader_src: str, fragment_shader_src: str) -> QOpenGLShaderProgram:
+        gl_program = QOpenGLShaderProgram()
+        gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, vertex_shader_src)
+        gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, fragment_shader_src)
+        gl_program.link()
+        return gl_program
 
 
 class FacesShaderProgram(ShaderProgram):
 
-    def __init__(self, postions_vbo: QOpenGLBuffer, normals_vbo: QOpenGLBuffer):
+    def __init__(self, mesh: trimesh.Trimesh):
         super().__init__(vertex_shader_src=FACES_VERTEX_SHADER_SRC, fragment_shader_src=FACES_FRAGMENT_SHADER_SRC)
-        self._positions_vbo = postions_vbo
-        self._normals_vbo = normals_vbo
+        self._mesh = mesh
+
+        self._positions_vbo = None
+        self._normals_vbo = None
 
         self._vao = QOpenGLVertexArrayObject()
         self._ebo = None
 
-    def init(self):
+    def init(self, postions_vbo: QOpenGLBuffer, normals_vbo: QOpenGLBuffer):
+        self._positions_vbo = postions_vbo
+        self._normals_vbo = normals_vbo
+
+        self._ebo = self._create_faces_ebo_buffer()
+
         self._vao = QOpenGLVertexArrayObject()
         self._vao.create()
         self._vao.bind()
@@ -187,6 +196,17 @@ class FacesShaderProgram(ShaderProgram):
         self._positions_vbo.release()
         self._gl_program.release()
 
+    def _create_faces_ebo_buffer(self) -> QOpenGLBuffer:
+        faces = np.array(self._mesh.faces, dtype=np.uint32)
+
+        ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
+        ebo.create()
+        ebo.bind()
+        ebo.setUsagePattern(QOpenGLBuffer.StaticDraw)
+        ebo.allocate(faces.tobytes(), faces.nbytes)
+        ebo.release()
+        return ebo
+
 
 class EdgesShaderProgram(ShaderProgram):
 
@@ -208,7 +228,7 @@ class OpenGlWin(QOpenGLWidget):
         self._mesh = self._read_mesh(stl_path)
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
-        self._faces_shader_program = QOpenGLShaderProgram()
+        self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._positions_vbo: Optional[QOpenGLBuffer] = None
         self._normals_vbo: Optional[QOpenGLBuffer] = None
         self._faces_ebo: Optional[QOpenGLBuffer] = None
@@ -237,14 +257,15 @@ class OpenGlWin(QOpenGLWidget):
         mesh.apply_transform(rot_mat)
 
     def initializeGL(self):
-        self._faces_shader_program = self._create_faces_shader_program()
+        #self._faces_shader_program.init(postions_vbo=self._positions_vbo, normals_vbo=self._normals_vbo)
+        self._faces_shader_program._gl_program = self._create_faces_shader_program()
         self._edges_shader_program = self._create_edges_shader_program()
         self._vertices_shader_program = self._create_vertices_shader_program()
 
         self._positions_vbo = self._create_positions_vbo_buffer(np.array(self._mesh.vertices, dtype=np.float32))
         self._normals_vbo = self._create_normals_vbo_buffer(np.array(self._mesh.vertex_normals, dtype=np.float32))
         self._faces_ebo = self._create_faces_ebo_buffer(self._mesh)
-        self._edges_ebe = self._create_edges_ebo_buffer(self._edges_array)
+        self._edges_ebo = self._create_edges_ebo_buffer(self._edges_array)
 
         self._init_faces_shader_program()
         self._init_vertices_shader_program()
@@ -304,19 +325,21 @@ class OpenGlWin(QOpenGLWidget):
 
         self._faces_ebo.bind()
 
-        self._faces_shader_program.bind()
-        self._faces_shader_program.enableAttributeArray(0)
-        self._faces_shader_program.enableAttributeArray(1)
+        gl_prg = self._faces_shader_program._gl_program
+
+        gl_prg.bind()
+        gl_prg.enableAttributeArray(0)
+        gl_prg.enableAttributeArray(1)
 
         # set light parameters
-        self._faces_shader_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        self._faces_shader_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+        gl_prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        gl_prg.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
 
         self._faces_vao.release()
         self._normals_vbo.release()
         self._faces_ebo.release()
         self._positions_vbo.release()
-        self._faces_shader_program.release()
+        gl_prg.release()
 
     def _init_edges_shader_program(self) -> None:
         self._edges_vao = QOpenGLVertexArrayObject()
@@ -415,15 +438,16 @@ class OpenGlWin(QOpenGLWidget):
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
         # paint faces
-        self._faces_shader_program.bind()
-        self._faces_shader_program.setUniformValue("mvp_matrix", mvp_matrix)
-        self._faces_shader_program.setUniformValue("cameraPos", QVector3D(*self._camera.xyz))
+        faces_prg = self._faces_shader_program._gl_program
+        faces_prg.bind()
+        faces_prg.setUniformValue("mvp_matrix", mvp_matrix)
+        faces_prg.setUniformValue("cameraPos", QVector3D(*self._camera.xyz))
         self._faces_vao.bind()
 
         glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
 
         self._faces_vao.release()
-        self._faces_shader_program.release()
+        faces_prg.release()
 
         # paint edges
         #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
