@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from typing import Tuple, Optional
@@ -94,48 +95,6 @@ VERTICES_FRAGMENT_SHADER_SRC = """
 """
 
 
-@dataclass
-class Camera:
-
-    def __init__(self, distance: float, azimuth: float, elevation: float):
-        self.distance = distance
-        self._azimuth = azimuth
-        self._elevation = elevation
-
-    @property
-    def distance(self) -> float:
-        return self._distance
-
-    @distance.setter
-    def distance(self, value: float) -> None:
-        self._distance = max(1.0, min(100.0, value))  # bound zoom interval
-
-    @property
-    def azimuth(self) -> float:
-        return self._azimuth
-
-    @azimuth.setter
-    def azimuth(self, value: float) -> None:
-        self._azimuth = value
-
-    @property
-    def elevation(self) -> float:
-        return self._elevation
-
-    @elevation.setter
-    def elevation(self, value: float) -> None:
-        self._elevation = max(-89.0, min(89.0, value))
-
-    @property
-    def xyz(self) -> Tuple[float, float, float]:
-        elevation_rad = np.radians(self.elevation)
-        azimuth_rad = np.radians(self.azimuth)
-        x = self.distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        y = self.distance * np.sin(elevation_rad)
-        z = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
-        return x, y, z
-
-
 class ShaderProgram:
 
     def __init__(self, vertex_shader_src: str, fragment_shader_src: str):
@@ -143,13 +102,11 @@ class ShaderProgram:
         self._fragment_shader_src = fragment_shader_src
         self._gl_program: Optional[QOpenGLShaderProgram] = None
 
-    @staticmethod
-    def link(vertex_shader_src: str, fragment_shader_src: str) -> QOpenGLShaderProgram:
-        gl_program = QOpenGLShaderProgram()
-        gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, vertex_shader_src)
-        gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, fragment_shader_src)
-        gl_program.link()
-        return gl_program
+    def link(self) -> None:
+        self._gl_program = QOpenGLShaderProgram()
+        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, self._vertex_shader_src)
+        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, self._fragment_shader_src)
+        self._gl_program.link()
 
 
 class FacesShaderProgram(ShaderProgram):
@@ -207,6 +164,19 @@ class FacesShaderProgram(ShaderProgram):
         ebo.release()
         return ebo
 
+    def paint(self, camera: Camera, mvp_matrix: np.array) -> None:
+        prg = self._gl_program
+        prg.bind()
+        prg.setUniformValue("mvp_matrix", mvp_matrix)
+        prg.setUniformValue("cameraPos", QVector3D(*camera.xyz))
+
+        self._vao.bind()
+
+        glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
+
+        self._vao.release()
+        prg.release()
+
 
 class EdgesShaderProgram(ShaderProgram):
 
@@ -220,6 +190,47 @@ class VerticesShaderProgram(ShaderProgram):
         super().__init__(vertex_shader_src=VERTICES_VERTEX_SHADER_SRC, fragment_shader_src=VERTICES_FRAGMENT_SHADER_SRC)
 
 
+@dataclass
+class Camera:
+
+    def __init__(self, distance: float, azimuth: float, elevation: float):
+        self.distance = distance
+        self._azimuth = azimuth
+        self._elevation = elevation
+
+    @property
+    def distance(self) -> float:
+        return self._distance
+
+    @distance.setter
+    def distance(self, value: float) -> None:
+        self._distance = max(1.0, min(100.0, value))  # bound zoom interval
+
+    @property
+    def azimuth(self) -> float:
+        return self._azimuth
+
+    @azimuth.setter
+    def azimuth(self, value: float) -> None:
+        self._azimuth = value
+
+    @property
+    def elevation(self) -> float:
+        return self._elevation
+
+    @elevation.setter
+    def elevation(self, value: float) -> None:
+        self._elevation = max(-89.0, min(89.0, value))
+
+    @property
+    def xyz(self) -> Tuple[float, float, float]:
+        elevation_rad = np.radians(self.elevation)
+        azimuth_rad = np.radians(self.azimuth)
+        x = self.distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
+        y = self.distance * np.sin(elevation_rad)
+        z = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        return x, y, z
+
 
 class OpenGlWin(QOpenGLWidget):
 
@@ -231,9 +242,7 @@ class OpenGlWin(QOpenGLWidget):
         self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._positions_vbo: Optional[QOpenGLBuffer] = None
         self._normals_vbo: Optional[QOpenGLBuffer] = None
-        self._faces_ebo: Optional[QOpenGLBuffer] = None
 
-        self._faces_vao: Optional[QOpenGLVertexArrayObject] = None
         self._edges_vao: Optional[QOpenGLVertexArrayObject] = None
         self._vertices_vao: Optional[QOpenGLVertexArrayObject] = None
 
@@ -257,29 +266,20 @@ class OpenGlWin(QOpenGLWidget):
         mesh.apply_transform(rot_mat)
 
     def initializeGL(self):
-        #self._faces_shader_program.init(postions_vbo=self._positions_vbo, normals_vbo=self._normals_vbo)
-        self._faces_shader_program._gl_program = self._create_faces_shader_program()
+        self._faces_shader_program.link()
         self._edges_shader_program = self._create_edges_shader_program()
         self._vertices_shader_program = self._create_vertices_shader_program()
 
         self._positions_vbo = self._create_positions_vbo_buffer(np.array(self._mesh.vertices, dtype=np.float32))
         self._normals_vbo = self._create_normals_vbo_buffer(np.array(self._mesh.vertex_normals, dtype=np.float32))
-        self._faces_ebo = self._create_faces_ebo_buffer(self._mesh)
         self._edges_ebo = self._create_edges_ebo_buffer(self._edges_array)
 
-        self._init_faces_shader_program()
+        self._faces_shader_program.init(postions_vbo=self._positions_vbo, normals_vbo=self._normals_vbo)
         self._init_vertices_shader_program()
 
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-    def _create_faces_shader_program(self) -> QOpenGLShaderProgram:
-        shader_program = QOpenGLShaderProgram()
-        shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, FACES_VERTEX_SHADER_SRC)
-        shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FACES_FRAGMENT_SHADER_SRC)
-        shader_program.link()
-        return shader_program
 
     def _create_edges_shader_program(self)-> QOpenGLShaderProgram:
         shader_program = QOpenGLShaderProgram()
@@ -310,36 +310,6 @@ class OpenGlWin(QOpenGLWidget):
         # vertices_data = np.hstack((vertices_array[faces.flatten()], face_normals)).astype(np.float32)  # for face normals instead of vertex normals
 
         return vertices_data
-
-    def _init_faces_shader_program(self) -> None:
-        self._faces_vao = QOpenGLVertexArrayObject()
-        self._faces_vao.create()
-        self._faces_vao.bind()
-
-        self._positions_vbo.bind()
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
-
-        self._normals_vbo.bind()
-        #glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * item_size, ctypes.c_void_p(3 * item_size))
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
-
-        self._faces_ebo.bind()
-
-        gl_prg = self._faces_shader_program._gl_program
-
-        gl_prg.bind()
-        gl_prg.enableAttributeArray(0)
-        gl_prg.enableAttributeArray(1)
-
-        # set light parameters
-        gl_prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        gl_prg.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
-
-        self._faces_vao.release()
-        self._normals_vbo.release()
-        self._faces_ebo.release()
-        self._positions_vbo.release()
-        gl_prg.release()
 
     def _init_edges_shader_program(self) -> None:
         self._edges_vao = QOpenGLVertexArrayObject()
@@ -402,18 +372,6 @@ class OpenGlWin(QOpenGLWidget):
         return vbo
 
     @staticmethod
-    def _create_faces_ebo_buffer(mesh: trimesh.Trimesh) -> QOpenGLBuffer:
-        faces = np.array(mesh.faces, dtype=np.uint32)
-
-        ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
-        ebo.create()
-        ebo.bind()
-        ebo.setUsagePattern(QOpenGLBuffer.StaticDraw)
-        ebo.allocate(faces.tobytes(), faces.nbytes)
-        ebo.release()
-        return ebo
-
-    @staticmethod
     def _create_edges_ebo_buffer(edges_array: np.array) -> QOpenGLBuffer:
         ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
         ebo.create()
@@ -438,42 +396,7 @@ class OpenGlWin(QOpenGLWidget):
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
         # paint faces
-        faces_prg = self._faces_shader_program._gl_program
-        faces_prg.bind()
-        faces_prg.setUniformValue("mvp_matrix", mvp_matrix)
-        faces_prg.setUniformValue("cameraPos", QVector3D(*self._camera.xyz))
-        self._faces_vao.bind()
-
-        glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
-
-        self._faces_vao.release()
-        faces_prg.release()
-
-        # paint edges
-        #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
-        glEnable(GL_POLYGON_OFFSET_LINE)  # no effect
-        glPolygonOffset(-1.0, -1.0)  # no effect
-        glLineWidth(2.0)
-
-        self._edges_shader_program.bind()
-        self._edges_shader_program.setUniformValue("mvp_matrix", mvp_matrix)
-        self._faces_vao.bind()
-
-        #glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)
-
-        self._faces_vao.release()
-        self._edges_shader_program.release()
-
-        # paint vertices
-        glPointSize(5.0)
-        self._vertices_shader_program.bind()
-        self._vertices_shader_program.setUniformValue("mvp_matrix", mvp_matrix)
-        self._faces_vao.bind()
-
-        glDrawElements(GL_POINTS, self._mesh.vertices.size, GL_UNSIGNED_INT, None)
-
-        self._faces_vao.release()
-        self._edges_shader_program.release()
+        self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
 
         glDisable(GL_POLYGON_OFFSET_LINE)
         #glDepthMask(GL_TRUE)  # depth buffer writing reactivate
