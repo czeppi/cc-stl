@@ -213,13 +213,13 @@ class VerticesShaderProgram(ShaderProgram):
         prg.release()
 
     def _create_ebo(self) -> QOpenGLBuffer:
-        faces = np.array(self._mesh.faces, dtype=np.uint32)
+        vertex_indices = np.arange(len(self._mesh.vertices), dtype=np.uint32)
 
         ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
         ebo.create()
         ebo.bind()
         ebo.setUsagePattern(QOpenGLBuffer.StaticDraw)
-        ebo.allocate(faces.tobytes(), faces.nbytes)
+        ebo.allocate(vertex_indices.tobytes(), vertex_indices.nbytes)
         ebo.release()
         return ebo
 
