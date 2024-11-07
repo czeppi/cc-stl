@@ -119,39 +119,40 @@ class FacesShaderProgram(ShaderProgram):
         self._normals_vbo = None
 
         self._vao = QOpenGLVertexArrayObject()
-        self._ebo = None
+        self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
 
     def init(self, positions_vbo: QOpenGLBuffer, normals_vbo: QOpenGLBuffer) -> None:
         self._positions_vbo = positions_vbo
         self._normals_vbo = normals_vbo
 
-        self._ebo = self._create_ebo()
+        prg = self._gl_program
+        vao = self._vao = QOpenGLVertexArrayObject()
+        ebo = self._ebo = self._create_ebo()
 
-        self._vao = QOpenGLVertexArrayObject()
-        self._vao.create()
-        self._vao.bind()
+        vao.create()
+        vao.bind()
 
-        self._positions_vbo.bind()
+        positions_vbo.bind()
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
 
-        self._normals_vbo.bind()
+        normals_vbo.bind()
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
 
-        self._ebo.bind()
+        ebo.bind()
 
-        self._gl_program.bind()
-        self._gl_program.enableAttributeArray(0)
-        self._gl_program.enableAttributeArray(1)
+        prg.bind()
+        prg.enableAttributeArray(0)
+        prg.enableAttributeArray(1)
 
         # set light parameters
-        self._gl_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        self._gl_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+        prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        prg.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
 
-        self._vao.release()
-        self._normals_vbo.release()
-        self._ebo.release()
-        self._positions_vbo.release()
-        self._gl_program.release()
+        vao.release()
+        normals_vbo.release()
+        ebo.release()
+        positions_vbo.release()
+        prg.release()
 
     def _create_ebo(self) -> QOpenGLBuffer:
         faces = np.array(self._mesh.faces, dtype=np.uint32)
@@ -194,13 +195,12 @@ class VerticesShaderProgram(ShaderProgram):
         self._mesh = mesh
 
         self._vao = QOpenGLVertexArrayObject()
-        self._ebo = None
+        self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
 
     def init(self, positions_vbo: QOpenGLBuffer) -> None:
         prg = self._gl_program
         vao = self._vao = QOpenGLVertexArrayObject()
-
-        self._ebo = self._create_ebo()
+        ebo = self._ebo = self._create_ebo()
 
         vao.create()
         vao.bind()
@@ -208,14 +208,14 @@ class VerticesShaderProgram(ShaderProgram):
         positions_vbo.bind()
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
 
-        self._ebo.bind()
+        ebo.bind()
 
         prg.bind()
         prg.enableAttributeArray(0)
 
-        self._ebo.release()
-        positions_vbo.release()
         vao.release()
+        ebo.release()
+        positions_vbo.release()
         prg.release()
 
     def _create_ebo(self) -> QOpenGLBuffer:
@@ -232,21 +232,6 @@ class VerticesShaderProgram(ShaderProgram):
     def paint(self, mvp_matrix: np.array) -> None:
         prg = self._gl_program
         vao = self._vao
-
-        glPointSize(5.0)
-
-        prg.bind()
-        prg.setUniformValue("mvp_matrix", mvp_matrix)
-        vao.bind()
-
-        glDrawElements(GL_POINTS, self._mesh.vertices.size, GL_UNSIGNED_INT, None)
-
-        vao.release()
-        prg.release()
-
-    def paint2(self, mvp_matrix: np.array, faces_vao) -> None:
-        prg = self._gl_program
-        vao = faces_vao
 
         glPointSize(5.0)
 
@@ -470,7 +455,7 @@ class OpenGlWin(QOpenGLWidget):
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
-        self._vertices_shader_program.paint2(mvp_matrix=mvp_matrix, faces_vao=self._faces_shader_program._vao)
+        self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
 
         # # paint edges
         # #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
