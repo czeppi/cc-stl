@@ -136,6 +136,71 @@ class Camera:
         return x, y, z
 
 
+class ShaderProgram:
+
+    def __init__(self, vertex_shader_src: str, fragment_shader_src: str):
+        self._vertex_shader_src = vertex_shader_src
+        self._fragment_shader_src = fragment_shader_src
+        self._gl_program: Optional[QOpenGLShaderProgram] = None
+
+    def compile(self) -> None:
+        self._gl_program = QOpenGLShaderProgram()
+        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Vertex, FACES_VERTEX_SHADER_SRC)
+        self._gl_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FACES_FRAGMENT_SHADER_SRC)
+        self._gl_program.link()
+
+
+class FacesShaderProgram(ShaderProgram):
+
+    def __init__(self, postions_vbo: QOpenGLBuffer, normals_vbo: QOpenGLBuffer):
+        super().__init__(vertex_shader_src=FACES_VERTEX_SHADER_SRC, fragment_shader_src=FACES_FRAGMENT_SHADER_SRC)
+        self._positions_vbo = postions_vbo
+        self._normals_vbo = normals_vbo
+
+        self._vao = QOpenGLVertexArrayObject()
+        self._ebo = None
+
+    def init(self):
+        self._vao = QOpenGLVertexArrayObject()
+        self._vao.create()
+        self._vao.bind()
+
+        self._positions_vbo.bind()
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        self._normals_vbo.bind()
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        self._ebo.bind()
+
+        self._gl_program.bind()
+        self._gl_program.enableAttributeArray(0)
+        self._gl_program.enableAttributeArray(1)
+
+        # set light parameters
+        self._gl_program.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        self._gl_program.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+
+        self._vao.release()
+        self._normals_vbo.release()
+        self._ebo.release()
+        self._positions_vbo.release()
+        self._gl_program.release()
+
+
+class EdgesShaderProgram(ShaderProgram):
+
+    def __init__(self):
+        super().__init__(vertex_shader_src=EDGES_VERTEX_SHADER_SRC, fragment_shader_src=EDGES_FRAGMENT_SHADER_SRC)
+
+
+class VerticesShaderProgram(ShaderProgram):
+
+    def __init__(self):
+        super().__init__(vertex_shader_src=VERTICES_VERTEX_SHADER_SRC, fragment_shader_src=VERTICES_FRAGMENT_SHADER_SRC)
+
+
+
 class OpenGlWin(QOpenGLWidget):
 
     def __init__(self, stl_path: str, parent: QWindow):
@@ -176,15 +241,12 @@ class OpenGlWin(QOpenGLWidget):
         self._edges_shader_program = self._create_edges_shader_program()
         self._vertices_shader_program = self._create_vertices_shader_program()
 
-        vertices_data = self._create_vertices_data(self._mesh)
-
         self._positions_vbo = self._create_positions_vbo_buffer(np.array(self._mesh.vertices, dtype=np.float32))
-        #self._normals_vbo = self._create_faces_vbo_buffer(vertices_data)
         self._normals_vbo = self._create_normals_vbo_buffer(np.array(self._mesh.vertex_normals, dtype=np.float32))
         self._faces_ebo = self._create_faces_ebo_buffer(self._mesh)
         self._edges_ebe = self._create_edges_ebo_buffer(self._edges_array)
 
-        self._init_faces_shader_program(vertices_data.itemsize)
+        self._init_faces_shader_program()
         self._init_vertices_shader_program()
 
         glEnable(GL_DEPTH_TEST)
@@ -192,21 +254,21 @@ class OpenGlWin(QOpenGLWidget):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def _create_faces_shader_program(self) -> QOpenGLShaderProgram:
-        shader_program = QOpenGLShaderProgram(self)
+        shader_program = QOpenGLShaderProgram()
         shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, FACES_VERTEX_SHADER_SRC)
         shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, FACES_FRAGMENT_SHADER_SRC)
         shader_program.link()
         return shader_program
 
     def _create_edges_shader_program(self)-> QOpenGLShaderProgram:
-        shader_program = QOpenGLShaderProgram(self)
+        shader_program = QOpenGLShaderProgram()
         shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, EDGES_VERTEX_SHADER_SRC)
         shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, EDGES_FRAGMENT_SHADER_SRC)
         shader_program.link()
         return shader_program
 
     def _create_vertices_shader_program(self)-> QOpenGLShaderProgram:
-        shader_program = QOpenGLShaderProgram(self)
+        shader_program = QOpenGLShaderProgram()
         shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex, VERTICES_VERTEX_SHADER_SRC)
         shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment, VERTICES_FRAGMENT_SHADER_SRC)
         shader_program.link()
@@ -228,7 +290,7 @@ class OpenGlWin(QOpenGLWidget):
 
         return vertices_data
 
-    def _init_faces_shader_program(self, item_size: int) -> None:
+    def _init_faces_shader_program(self) -> None:
         self._faces_vao = QOpenGLVertexArrayObject()
         self._faces_vao.create()
         self._faces_vao.bind()
