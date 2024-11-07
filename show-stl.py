@@ -224,9 +224,11 @@ class OpenGlWin(QOpenGLWidget):
 
     def mouseMoveEvent(self, event):
         if self._is_right_button_pressed:
+            sensitivity = self._camera.distance / 200
+
             delta = event.position().toPoint() - self._last_mouse_position
-            d_azimuth = -delta.x() * 0.25  # sensitivity for azimuth
-            d_elevation = delta.y() * 0.25  # sensitivity for elevation
+            d_azimuth = -delta.x() * sensitivity
+            d_elevation = delta.y() * sensitivity
 
             self._camera.azimuth += d_azimuth
             #self._camera.rotate_vertical(d_elevation)
