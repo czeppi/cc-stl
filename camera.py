@@ -15,6 +15,7 @@ class Camera:
         self._distance = distance
         self._azimuth = azimuth  # horizontal angle in degree
         self._elevation = elevation  # vertical angle in degree
+        self._fov = 45.0  # field of view (= view angle)
 
     @property
     def distance(self) -> float:
@@ -22,7 +23,7 @@ class Camera:
 
     @distance.setter
     def distance(self, value: float) -> None:
-        self._distance = max(1.0, min(100.0, value))  # bound zoom interval
+        self._distance = max(1.0, min(500.0, value))  # bound zoom interval
 
     @property
     def azimuth(self) -> float:
@@ -39,6 +40,14 @@ class Camera:
     @elevation.setter
     def elevation(self, value: float) -> None:
         self._elevation = max(-89.0, min(89.0, value))
+
+    @property
+    def fov(self) -> float:
+        return self._fov
+
+    @fov.setter
+    def fov(self, value: float) -> None:
+        self._fov = max(1.0, min(85.0, value))
 
     @property
     def xyz(self) -> Tuple[float, float, float]:

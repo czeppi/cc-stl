@@ -250,6 +250,9 @@ class VerticesShaderProgram(ShaderProgram):
         self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
 
     def init(self, positions_vbo: QOpenGLBuffer) -> None:
+        if len(self._selected_indices) == 0:
+            return
+
         prg = self._gl_program
         vao = self._vao = QOpenGLVertexArrayObject()
         ebo = self._ebo = self._create_ebo()
@@ -284,6 +287,9 @@ class VerticesShaderProgram(ShaderProgram):
         return ebo
 
     def paint(self, mvp_matrix: np.array) -> None:
+        if len(self._selected_indices) == 0:
+            return
+
         prg = self._gl_program
         vao = self._vao
 
