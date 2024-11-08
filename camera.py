@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
+from PySide6.QtGui import QMatrix4x4
 
 
 @dataclass
@@ -48,24 +49,6 @@ class Camera:
         z = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
         return x, y, z
 
-    def rotate_vertical(self, delta_angle: float) -> None:
-        """ delta_angle in degree
-            y is up-axis
-        """
-        r = self.distance
-        x1, y1, z1 = self.xyz
-        xz1 = math.hypot(x1, z1)
-        angle_old = math.atan(y1 / xz1)
-        angle_new = angle_old + delta_angle * math.pi / 180
-
-        xz2 = r * math.cos(angle_new)
-        y2 = r * math.sin(angle_new)
-
-        x2 = xz2 / xz1 * x1
-        z2 = xz2 / xz1 * z1
-
-        self._distance, self._azimuth, self._elevation = self._calc_distance_azimuth_elevation(x2, y2, z2)
-
     @staticmethod
     def _calc_distance_azimuth_elevation(x: float, y: float, z: float) -> Tuple[float, float, float]:
         distance = math.hypot(x, y, z)
@@ -73,3 +56,60 @@ class Camera:
         elevation = 180 / math.pi * math.atan(y / xz)
         azimuth = 180 / math.pi * math.atan2(x, z)
         return distance, azimuth, elevation
+
+    def create_view_matrix(self) -> QMatrix4x4:
+        """ cals view matrix in dependency of the camera
+        """
+        eye = np.array(self.xyz, dtype=np.float32)
+        up_vector = np.array([0, 1, 0], dtype=np.float32)
+
+        z_axis = 1 * eye
+        z_axis /= np.linalg.norm(z_axis)
+
+        x_axis = np.cross(up_vector, z_axis)
+        x_axis /= np.linalg.norm(x_axis)
+
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis /= np.linalg.norm(y_axis)
+
+        # m = QMatrix4x4(
+        #     x_axis[0], y_axis[0], z_axis[0], -np.dot(x_axis, eye),
+        #     x_axis[1], y_axis[1], z_axis[1], -np.dot(y_axis, eye),
+        #     x_axis[2], y_axis[2], z_axis[2], -np.dot(z_axis, eye),
+        #     0, 0, 0, 1
+        # )
+        print(f'        old: eye={eye}, x={x_axis}, y={y_axis}, z={z_axis}, dotx={-np.dot(x_axis, eye)}, doty={-np.dot(y_axis, eye)}, dotz={-np.dot(z_axis, eye)}')
+        m = QMatrix4x4(
+            x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye),
+            y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
+            z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye),
+            0, 0, 0, 1
+        )
+        return m
+
+    def create_view_matrix_new(self) -> QMatrix4x4:
+        """ cals view matrix in dependency of the camera
+        """
+        eye = np.array(self.xyz, dtype=np.float32)
+        up_vector = np.array([0, 1, 0], dtype=np.float32)
+
+        z_axis = 1 * eye
+        z_axis /= np.linalg.norm(z_axis)
+
+        x_axis = np.cross(up_vector, z_axis)
+        x_axis /= np.linalg.norm(x_axis)
+
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis /= np.linalg.norm(y_axis)
+
+        view_matrix = np.identity(4)
+        view_matrix[0, :3] = x_axis
+        view_matrix[1, :3] = y_axis
+        view_matrix[2, :3] = z_axis
+        view_matrix[:3, 3] = -eye @ np.array([x_axis, y_axis, z_axis])
+        print(f'        new: eye={eye}, x={x_axis}, y={y_axis}, z={z_axis}, @={-eye @ np.array([x_axis, y_axis, z_axis])}')
+
+
+        view_matrix_flatten = view_matrix.flatten()
+        m = QMatrix4x4(*view_matrix_flatten)
+        return m

@@ -64,6 +64,7 @@ class OpenGlWin(QOpenGLWidget):
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glClearColor(1.0, 1.0, 1.0,1.0)
 
     @staticmethod
     def _create_positions_vbo_buffer(vertices: np.array) -> QOpenGLBuffer:
@@ -96,8 +97,8 @@ class OpenGlWin(QOpenGLWidget):
 
         # mvp_matrix
         model_matrix = self._create_eye_matrix()
-        view_matrix = self._calculate_view_matrix()
-        view_matrix2 = self._calculate_view_matrix_new()
+        view_matrix = self._camera.create_view_matrix()
+        view_matrix2 = self._camera.create_view_matrix_new()
         print(f'xyz={self._camera.xyz}')
         print(f'    old={self._mat4_str(view_matrix)}')
         print(f'    new={self._mat4_str(view_matrix2)}')
@@ -106,7 +107,7 @@ class OpenGlWin(QOpenGLWidget):
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
-        self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
+        #self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
         #self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
 
     def _mat4_str(self, m):
@@ -149,69 +150,6 @@ class OpenGlWin(QOpenGLWidget):
             0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
             0, 0, -1, 0
         )
-
-    @staticmethod
-    def _create_translation_matrix(x, y, z) -> QMatrix4x4:
-        return QMatrix4x4(
-            1, 0, 0, x,
-            0, 1, 0, y,
-            0, 0, 1, z,
-            0, 0, 0, 1
-        )
-
-    def _calculate_view_matrix_new(self) -> QMatrix4x4:
-        """ cals view matrix in dependency of the camera
-        """
-        eye = np.array(self._camera.xyz, dtype=np.float32)
-        up_vector = np.array([0, 1, 0], dtype=np.float32)
-
-        z_axis = 1 * eye
-        z_axis /= np.linalg.norm(z_axis)
-
-        x_axis = np.cross(up_vector, z_axis)
-        x_axis /= np.linalg.norm(x_axis)
-
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis /= np.linalg.norm(y_axis)
-
-        view_matrix = np.identity(4)
-        view_matrix[0, :3] = x_axis
-        view_matrix[1, :3] = y_axis
-        view_matrix[2, :3] = z_axis
-        view_matrix[:3, 3] = -eye @ np.array([x_axis, y_axis, z_axis])
-
-        view_matrix_flatten = view_matrix.flatten()
-        m = QMatrix4x4(*view_matrix_flatten)
-        return m
-
-    def _calculate_view_matrix(self) -> QMatrix4x4:
-        """ cals view matrix in dependency of the camera
-        """
-        eye = np.array(self._camera.xyz, dtype=np.float32)
-        up_vector = np.array([0, 1, 0], dtype=np.float32)
-
-        z_axis = 1 * eye
-        z_axis /= np.linalg.norm(z_axis)
-
-        x_axis = np.cross(up_vector, z_axis)
-        x_axis /= np.linalg.norm(x_axis)
-
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis /= np.linalg.norm(y_axis)
-
-        # m = QMatrix4x4(
-        #     x_axis[0], y_axis[0], z_axis[0], -np.dot(x_axis, eye),
-        #     x_axis[1], y_axis[1], z_axis[1], -np.dot(y_axis, eye),
-        #     x_axis[2], y_axis[2], z_axis[2], -np.dot(z_axis, eye),
-        #     0, 0, 0, 1
-        # )
-        m = QMatrix4x4(
-            x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye),
-            y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
-            z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye),
-            0, 0, 0, 1
-        )
-        return m
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:

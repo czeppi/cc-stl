@@ -47,9 +47,9 @@ FACES_FRAGMENT_SHADER_SRC = """
         vec3 normal = normalize(fragNormal);
         vec3 viewDir = normalize(cameraPos - fragPosition);
         float intensity = max(dot(viewDir, normal), 0.0);
-        vec3 result = ambientColor * objectColor * intensity + 0.2;  // todo: offset is nor correct
+        vec3 result = ambientColor * objectColor * intensity ;  // todo: offset is nor correct
 
-        fragColor = vec4(result, 0.5);
+        fragColor = vec4(result, 1.0);
     }
 """
 
@@ -139,7 +139,7 @@ class FacesShaderProgram(ShaderProgram):
 
         # set light parameters
         prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        prg.setUniformValue("objectColor", QVector3D(0.6, 0.6, 0.8))  # object color
+        prg.setUniformValue("objectColor", QVector3D(0.4, 0.4, 0.8))  # object color
 
         vao.release()
         normals_vbo.release()
