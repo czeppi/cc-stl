@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import trimesh
@@ -21,16 +21,18 @@ class OpenGlWin(QOpenGLWidget):
     def __init__(self, stl_path: str, parent: QWindow):
         super().__init__()
         self._mesh = self._read_mesh(stl_path)
+        self._selected_vertex_indices = [20000]
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._edges_shader_program = EdgesShaderProgram(self._mesh)
-        self._vertices_shader_program = VerticesShaderProgram(self._mesh)
-
+        self._vertices_shader_program = VerticesShaderProgram(self._mesh,
+                                                              selected_indices=self._selected_vertex_indices)
         self._positions_vbo: Optional[QOpenGLBuffer] = None
         self._normals_vbo: Optional[QOpenGLBuffer] = None
 
         self._projection_matrix = QMatrix4x4()
+        self._view_size: Optional[Tuple[int, int]] = None
 
         # camera
         self._camera = Camera(distance=50.0, azimuth=180.0, elevation=45.0)
@@ -91,6 +93,7 @@ class OpenGlWin(QOpenGLWidget):
 
         aspect_ratio = width / height
         self._projection_matrix = self._create_perspective_matrix(45.0, aspect_ratio, 0.1, 100.0)
+        self._view_size = width, height
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -99,11 +102,53 @@ class OpenGlWin(QOpenGLWidget):
         model_matrix = self._create_eye_matrix()
         view_matrix = self._camera.create_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
+        self._print_sel_vertices_info(mvp_matrix)
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
         #self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
-        #self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
+        self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
+
+    def _print_sel_vertices_info(self, mvp_matrix: QMatrix4x4) -> None:
+        vertex_index = self._selected_vertex_indices[0]  # take only one
+        vertex_pos = self._mesh.vertices[vertex_index]
+        vertex_pos4d = np.array([vertex_pos[0], vertex_pos[1], vertex_pos[2], 1])
+
+        m = np.array([[mvp_matrix[0,0], mvp_matrix[0,1], mvp_matrix[0,2], mvp_matrix[0,3]],
+                      [mvp_matrix[1,0], mvp_matrix[1,1], mvp_matrix[1,2], mvp_matrix[1,3]],
+                      [mvp_matrix[2,0], mvp_matrix[2,1], mvp_matrix[2,2], mvp_matrix[2,3]],
+                      [mvp_matrix[3,0], mvp_matrix[3,1], mvp_matrix[3,2], mvp_matrix[3,3]]])
+
+        vertex_pos_transformed = m @ vertex_pos4d
+        x1, y1, z1, w1 = vertex_pos_transformed
+        w, h = self._view_size
+        x = (w / 2) + x1 / z1 * (w / 2)
+        y = (h / 2) - y1 / z1 * (h / 2)
+        print(f'{vertex_pos4d}, {x, y}')
+
+        self._transform_all_vertices(mvp_matrix)
+
+    def _transform_all_vertices(self, mvp_matrix: QMatrix4x4) -> None:
+        vertices = self._mesh.vertices
+        n = len(vertices)
+        transpose_vertices = np.transpose(vertices)
+        vertices_matrix = np.vstack([np.transpose(vertices), np.full(n, 1.0)])
+
+        m = np.array([[mvp_matrix[0,0], mvp_matrix[0,1], mvp_matrix[0,2], mvp_matrix[0,3]],
+                      [mvp_matrix[1,0], mvp_matrix[1,1], mvp_matrix[1,2], mvp_matrix[1,3]],
+                      [mvp_matrix[2,0], mvp_matrix[2,1], mvp_matrix[2,2], mvp_matrix[2,3]],
+                      [mvp_matrix[3,0], mvp_matrix[3,1], mvp_matrix[3,2], mvp_matrix[3,3]]])
+
+        x1_vec, y1_vec, z1_vec, w1_vec = m @ vertices_matrix
+        width2 = self._view_size[0] / 2.0
+        height2 = self._view_size[1] / 2.0
+        x2_vec = width2 + x1_vec / z1_vec * width2
+        y2_vec = height2 - y1_vec / z1_vec * height2
+
+        i = self._selected_vertex_indices[0]  # take only one
+        #sel_transformed =voidertex_pos_transformed[vertex_index]
+        print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z1_vec[i]}')
+        print()
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:

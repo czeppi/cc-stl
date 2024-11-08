@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import trimesh
@@ -83,7 +83,7 @@ VERTICES_FRAGMENT_SHADER_SRC = """
     #version 330
     out vec4 fragColor;
     void main() {
-        fragColor = vec4(0.0, 0.0, 1.0, 1.0);  // selected color for vertices
+        fragColor = vec4(0.0, 1.0, 0.0, 1.0);  // selected color for vertices
     }
 """
 
@@ -138,7 +138,8 @@ class FacesShaderProgram(ShaderProgram):
         prg.enableAttributeArray(1)
 
         # set light parameters
-        prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
+        prg.setUniformValue("ambientColor", QVector3D(1.0, 1.0, 1.0))
+        #prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
         prg.setUniformValue("objectColor", QVector3D(0.4, 0.4, 0.8))  # object color
 
         vao.release()
@@ -240,9 +241,10 @@ class EdgesShaderProgram(ShaderProgram):
 
 class VerticesShaderProgram(ShaderProgram):
 
-    def __init__(self, mesh: trimesh.Trimesh):
+    def __init__(self, mesh: trimesh.Trimesh, selected_indices: List[int]):
         super().__init__(vertex_shader_src=VERTICES_VERTEX_SHADER_SRC, fragment_shader_src=VERTICES_FRAGMENT_SHADER_SRC)
         self._mesh = mesh
+        self._selected_indices = selected_indices
 
         self._vao = QOpenGLVertexArrayObject()
         self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
@@ -269,7 +271,9 @@ class VerticesShaderProgram(ShaderProgram):
         prg.release()
 
     def _create_ebo(self) -> QOpenGLBuffer:
-        vertex_indices = np.arange(len(self._mesh.vertices), dtype=np.uint32)
+        n = len(self._mesh.vertices)
+        #vertex_indices = np.arange(n, dtype=np.uint32)
+        vertex_indices = np.array(self._selected_indices)
 
         ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
         ebo.create()
@@ -289,7 +293,9 @@ class VerticesShaderProgram(ShaderProgram):
         prg.setUniformValue("mvp_matrix", mvp_matrix)
         vao.bind()
 
-        glDrawElements(GL_POINTS, self._mesh.vertices.size, GL_UNSIGNED_INT, None)
+        #n = self._mesh.vertices.size
+        n = len(self._selected_indices)
+        glDrawElements(GL_POINTS, n, GL_UNSIGNED_INT, None)
 
         vao.release()
         prg.release()
