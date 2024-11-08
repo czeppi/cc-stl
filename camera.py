@@ -72,44 +72,10 @@ class Camera:
         y_axis = np.cross(z_axis, x_axis)
         y_axis /= np.linalg.norm(y_axis)
 
-        # m = QMatrix4x4(
-        #     x_axis[0], y_axis[0], z_axis[0], -np.dot(x_axis, eye),
-        #     x_axis[1], y_axis[1], z_axis[1], -np.dot(y_axis, eye),
-        #     x_axis[2], y_axis[2], z_axis[2], -np.dot(z_axis, eye),
-        #     0, 0, 0, 1
-        # )
-        print(f'        old: eye={eye}, x={x_axis}, y={y_axis}, z={z_axis}, dotx={-np.dot(x_axis, eye)}, doty={-np.dot(y_axis, eye)}, dotz={-np.dot(z_axis, eye)}')
         m = QMatrix4x4(
             x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye),
             y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
             z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye),
             0, 0, 0, 1
         )
-        return m
-
-    def create_view_matrix_new(self) -> QMatrix4x4:
-        """ cals view matrix in dependency of the camera
-        """
-        eye = np.array(self.xyz, dtype=np.float32)
-        up_vector = np.array([0, 1, 0], dtype=np.float32)
-
-        z_axis = 1 * eye
-        z_axis /= np.linalg.norm(z_axis)
-
-        x_axis = np.cross(up_vector, z_axis)
-        x_axis /= np.linalg.norm(x_axis)
-
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis /= np.linalg.norm(y_axis)
-
-        view_matrix = np.identity(4)
-        view_matrix[0, :3] = x_axis
-        view_matrix[1, :3] = y_axis
-        view_matrix[2, :3] = z_axis
-        view_matrix[:3, 3] = -eye @ np.array([x_axis, y_axis, z_axis])
-        print(f'        new: eye={eye}, x={x_axis}, y={y_axis}, z={z_axis}, @={-eye @ np.array([x_axis, y_axis, z_axis])}')
-
-
-        view_matrix_flatten = view_matrix.flatten()
-        m = QMatrix4x4(*view_matrix_flatten)
         return m

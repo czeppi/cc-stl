@@ -98,39 +98,12 @@ class OpenGlWin(QOpenGLWidget):
         # mvp_matrix
         model_matrix = self._create_eye_matrix()
         view_matrix = self._camera.create_view_matrix()
-        view_matrix2 = self._camera.create_view_matrix_new()
-        print(f'xyz={self._camera.xyz}')
-        print(f'    old={self._mat4_str(view_matrix)}')
-        print(f'    new={self._mat4_str(view_matrix2)}')
-
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
         #self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
         #self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
-
-    def _mat4_str(self, m):
-        parts = [f'{v:.03f}' for v in self._mat4_items(m)]
-        return ', '.join(parts)
-
-    def _mat4_items(self, m):
-        yield m[0,0]
-        yield m[0,1]
-        yield m[0,2]
-        yield m[0,3]
-        yield m[1,0]
-        yield m[1,1]
-        yield m[1,2]
-        yield m[1,3]
-        yield m[2,0]
-        yield m[2,1]
-        yield m[2,2]
-        yield m[2,3]
-        yield m[3,0]
-        yield m[3,1]
-        yield m[3,2]
-        yield m[3,3]
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
@@ -169,10 +142,7 @@ class OpenGlWin(QOpenGLWidget):
             d_elevation = delta.y() * sensitivity
 
             self._camera.azimuth += d_azimuth
-            #self._camera.rotate_vertical(d_elevation)
             self._camera.elevation += d_elevation
-            x, y, z = self._camera.xyz
-            #print(f'elevation: {self._camera._elevation}, y: {y}')
 
             self._last_mouse_position = event.position().toPoint()
             self.update()  # update screen
