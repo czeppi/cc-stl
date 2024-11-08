@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
 import numpy as np
@@ -14,6 +15,12 @@ from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
+
+
+@dataclass
+class MouseData:
+    last_position: QPoint = field(default_factory=QPoint)
+    is_right_button_pressed: bool = False
 
 
 class OpenGlWin(QOpenGLWidget):
@@ -36,8 +43,7 @@ class OpenGlWin(QOpenGLWidget):
 
         # camera
         self._camera = Camera(distance=50.0, azimuth=180.0, elevation=45.0)
-        self._last_mouse_position = QPoint()
-        self._is_right_button_pressed = False
+        self._mouse_data = MouseData()
 
     def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
         mesh = trimesh.load(stl_path)
@@ -171,25 +177,25 @@ class OpenGlWin(QOpenGLWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
-            self._is_right_button_pressed = True
-            self._last_mouse_position = event.position().toPoint()
+            self._mouse_data.last_position = event.position().toPoint()
+            self._mouse_data.is_right_button_pressed = True
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.RightButton:
-            self._is_right_button_pressed = False
+            self._mouse_data.is_right_button_pressed = False
 
     def mouseMoveEvent(self, event):
-        if self._is_right_button_pressed:
+        if self._mouse_data.is_right_button_pressed:
             sensitivity = self._camera.distance / 200
 
-            delta = event.position().toPoint() - self._last_mouse_position
+            delta = event.position().toPoint() - self._mouse_data.last_position
             d_azimuth = -delta.x() * sensitivity
             d_elevation = delta.y() * sensitivity
 
             self._camera.azimuth += d_azimuth
             self._camera.elevation += d_elevation
 
-            self._last_mouse_position = event.position().toPoint()
+            self._mouse_data.last_position = event.position().toPoint()
             self.update()  # update screen
 
     def wheelEvent(self, event):
