@@ -119,12 +119,10 @@ class OpenGlWin(QOpenGLWidget):
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
         item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
-        cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
+        #cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
         selected_vertex_indices = item_detector._find_vertex_indices_at_mouse(self._mouse_data.last_position)
-        selected_vertex_indices = [20000]
-
-        if len(selected_vertex_indices) > 0:
-            self._vertices_shader_program.set_selected_vertices(selected_vertex_indices)
+        print(f'selected_vertex_indices={selected_vertex_indices}')
+        self._vertices_shader_program.set_selected_vertices(selected_vertex_indices)
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
@@ -166,7 +164,7 @@ class OpenGlWin(QOpenGLWidget):
             self.update()  # update screen
         else:
             self._mouse_data.last_position = mouse_pos
-            print(f'mouse: {mouse_pos}')
+            #print(f'mouse: {mouse_pos}')
             self.update()  # update screen, for selected elements
 
     def wheelEvent(self, event):

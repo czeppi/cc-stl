@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import numpy as np
 import trimesh
@@ -51,17 +51,18 @@ class ItemDetectorAtMousePos:
         y2_vec = height2 - y1_vec / w1_vec * height2
         z2_vec = z1_vec / w1_vec
 
-        if len(SELECTED_VERTEX_INDICES) > 0:
-            i = SELECTED_VERTEX_INDICES[0]  # take only one
-            print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z2_vec[i]}')
-            print()
+        # if len(SELECTED_VERTEX_INDICES) > 0:
+        #     i = SELECTED_VERTEX_INDICES[0]  # take only one
+        #     print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z2_vec[i]}')
+        #     print()
 
         return np.array([x2_vec, y2_vec, z2_vec])
 
-    def find_cur_item(self, mouse_pos: QPoint) -> Optional[MeshItemKey]:
-        pass
+    def find_cur_item(self, mouse_pos: QPoint) -> List[int]: # Optional[MeshItemKey]:
+        vertex_array = self._find_vertex_indices_at_mouse(mouse_pos)
+        return vertex_array.tolist()
 
-    def _find_vertex_indices_at_mouse(self, mouse_pos: QPoint) -> np.array:
+    def _find_vertex_indices_at_mouse(self, mouse_pos: QPoint) -> List[int]:
         proj_vertices = np.transpose(self._projected_vertices)
         mouse_x, mouse_y = mouse_pos.x(), mouse_pos.y()
         d = 10.0  # max. distance between mouse and vertex on view
@@ -72,5 +73,5 @@ class ItemDetectorAtMousePos:
 
         vertex_indices = np.where((proj_vertices[:, 0] >= x_min) & (proj_vertices[:, 0] <= x_max) &
                                   (proj_vertices[:, 1] >= y_min) & (proj_vertices[:, 1] <= y_max))
-        #print(f'vertex_indices: {list(vertex_indices)}')
-        return vertex_indices
+        print(f'vertex_indices: {vertex_indices}')
+        return vertex_indices[0].tolist()

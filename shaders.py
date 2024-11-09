@@ -284,16 +284,18 @@ class VerticesShaderProgram(ShaderProgram):
         return ebo
 
     def set_selected_vertices(self, selected_indices: List[int]) -> None:
-        ebo = self._ebo
-        ebo.bind()
+        if len(selected_indices) > 0:
+            ebo = self._ebo
+            ebo.bind()
 
-        vertex_indices = np.array(selected_indices)
-        ebo.allocate(vertex_indices.tobytes(), vertex_indices.nbytes)
-        ebo.release()
+            vertex_indices = np.array(selected_indices)
+            ebo.allocate(vertex_indices.tobytes(), vertex_indices.nbytes)
+            ebo.release()
 
         self._selected_indices = selected_indices
 
     def paint(self, mvp_matrix: np.array) -> None:
+        print(f'vertex-print: #sel={len(self._selected_indices)}')
         if len(self._selected_indices) == 0:
             return
 
@@ -306,7 +308,6 @@ class VerticesShaderProgram(ShaderProgram):
         prg.setUniformValue("mvp_matrix", mvp_matrix)
         vao.bind()
 
-        #n = self._mesh.vertices.size
         n = len(self._selected_indices)
         glDrawElements(GL_POINTS, n, GL_UNSIGNED_INT, None)
 
