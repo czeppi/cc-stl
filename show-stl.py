@@ -25,8 +25,6 @@ STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
 GL_BACKGROUND_COLOR = [1.0, 1.0, 1.0]
 GL_VIEW_SIZE = 1200, 900
 
-SELECTED_VERTEX_INDICES = [20000]
-
 
 @dataclass
 class MouseData:
@@ -39,7 +37,6 @@ class OpenGlWin(QOpenGLWidget):
     def __init__(self, stl_path: str, parent: QWindow):
         super().__init__()
         self._mesh = self._read_mesh(stl_path)
-        self._selected_vertex_indices = SELECTED_VERTEX_INDICES
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
@@ -123,13 +120,11 @@ class OpenGlWin(QOpenGLWidget):
 
         item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
         cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
+        selected_vertex_indices = item_detector._find_vertex_indices_at_mouse(self._mouse_data.last_position)
+        selected_vertex_indices = [20000]
 
-        if len(self._selected_vertex_indices) > 0:
-            self._vertices_shader_program.set_selected_vertices(self._selected_vertex_indices)
-
-        #self._print_sel_vertices_info(mvp_matrix)
-
-        #sel_vertex_indices = self._find_vertex_indices_at_mouse(self._mouse_data.last_position, mvp_matrix)
+        if len(selected_vertex_indices) > 0:
+            self._vertices_shader_program.set_selected_vertices(selected_vertex_indices)
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
@@ -175,13 +170,13 @@ class OpenGlWin(QOpenGLWidget):
             self.update()  # update screen, for selected elements
 
     def wheelEvent(self, event):
-        # zoom_factor = 0.9 if event.angleDelta().y() > 0 else 1.1
-        # self._camera.distance *= zoom_factor
+        zoom_factor = 0.9 if event.angleDelta().y() > 0 else 1.1
+        self._camera.distance *= zoom_factor
 
-        fov_step = 2
-        fov_delta = -fov_step if event.angleDelta().y() > 0 else fov_step
-        self._camera.fov += fov_delta
-        print(f'fov={self._camera.fov}')
+        # fov_step = 2
+        # fov_delta = -fov_step if event.angleDelta().y() > 0 else fov_step
+        # self._camera.fov += fov_delta
+        # print(f'fov={self._camera.fov}')
 
         width, height = self._view_size
         aspect_ratio = width / height

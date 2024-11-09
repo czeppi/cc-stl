@@ -47,15 +47,16 @@ class ItemDetectorAtMousePos:
         x1_vec, y1_vec, z1_vec, w1_vec = m @ vertices_matrix
         width2 = self._view_size[0] / 2.0
         height2 = self._view_size[1] / 2.0
-        x2_vec = width2 + x1_vec / z1_vec * width2
-        y2_vec = height2 - y1_vec / z1_vec * height2
-        #z2_vec = z1_vec    # todo
+        x2_vec = width2 + x1_vec / w1_vec * width2
+        y2_vec = height2 - y1_vec / w1_vec * height2
+        z2_vec = z1_vec / w1_vec
 
         if len(SELECTED_VERTEX_INDICES) > 0:
             i = SELECTED_VERTEX_INDICES[0]  # take only one
-            print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z1_vec[i]}')
+            print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z2_vec[i]}')
+            print()
 
-        return np.array([x2_vec, y2_vec, z1_vec])
+        return np.array([x2_vec, y2_vec, z2_vec])
 
     def find_cur_item(self, mouse_pos: QPoint) -> Optional[MeshItemKey]:
         pass
