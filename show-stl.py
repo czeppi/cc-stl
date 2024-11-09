@@ -120,6 +120,10 @@ class OpenGlWin(QOpenGLWidget):
         model_matrix = self._create_eye_matrix()
         view_matrix = self._camera.create_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
+
+        if len(self._selected_vertex_indices) > 0:
+            self._vertices_shader_program.set_selected_vertices(self._selected_vertex_indices)
+
         #self._print_sel_vertices_info(mvp_matrix)
 
         sel_vertex_indices = self._find_vertex_indices_at_mouse(self._mouse_data.last_position, mvp_matrix)
