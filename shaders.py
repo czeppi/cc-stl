@@ -245,10 +245,10 @@ class EdgesShaderProgram(ShaderProgram):
 
 class VerticesShaderProgram(ShaderProgram):
 
-    def __init__(self, mesh: trimesh.Trimesh, selected_indices: List[int]):
+    def __init__(self, mesh: trimesh.Trimesh):
         super().__init__(vertex_shader_src=VERTICES_VERTEX_SHADER_SRC, fragment_shader_src=VERTICES_FRAGMENT_SHADER_SRC)
         self._mesh = mesh
-        self._selected_indices = selected_indices
+        self._selected_indices = []
 
         self._vao = QOpenGLVertexArrayObject()
         self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
@@ -283,8 +283,9 @@ class VerticesShaderProgram(ShaderProgram):
 
         vertex_indices = np.array(selected_indices)
         ebo.allocate(vertex_indices.tobytes(), vertex_indices.nbytes)
-
         ebo.release()
+
+        self._selected_indices = selected_indices
 
     def _create_ebo(self) -> QOpenGLBuffer:
         n = len(self._mesh.vertices)

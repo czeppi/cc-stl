@@ -14,6 +14,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
+from itemdetectoratmousepos import ItemDetectorAtMousePos
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 
@@ -43,8 +44,7 @@ class OpenGlWin(QOpenGLWidget):
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._edges_shader_program = EdgesShaderProgram(self._mesh)
-        self._vertices_shader_program = VerticesShaderProgram(self._mesh,
-                                                              selected_indices=self._selected_vertex_indices)
+        self._vertices_shader_program = VerticesShaderProgram(self._mesh)
         self._positions_vbo: Optional[QOpenGLBuffer] = None
         self._normals_vbo: Optional[QOpenGLBuffer] = None
 
@@ -121,54 +121,20 @@ class OpenGlWin(QOpenGLWidget):
         view_matrix = self._camera.create_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
+        item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
+        cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
+
         if len(self._selected_vertex_indices) > 0:
             self._vertices_shader_program.set_selected_vertices(self._selected_vertex_indices)
 
         #self._print_sel_vertices_info(mvp_matrix)
 
-        sel_vertex_indices = self._find_vertex_indices_at_mouse(self._mouse_data.last_position, mvp_matrix)
+        #sel_vertex_indices = self._find_vertex_indices_at_mouse(self._mouse_data.last_position, mvp_matrix)
 
         # paint
         self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
         self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
         self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
-
-    def _find_vertex_indices_at_mouse(self, mouse_pos: QPoint, mvp_matrix: QMatrix4x4) -> np.array:
-        proj_vertices = np.transpose(self._project_all_vertices(mvp_matrix))
-        mouse_pos = self._mouse_data.last_position
-        mouse_x, mouse_y = mouse_pos.x(), mouse_pos.y()
-        d = 20.0  # max. distance between mouse and vertex on view
-        x_min = mouse_x - d
-        x_max = mouse_x + d
-        y_min = mouse_y - d
-        y_max = mouse_y + d
-
-        vertex_indices = np.where((proj_vertices[:, 0] >= x_min) & (proj_vertices[:, 0] <= x_max) &
-                                  (proj_vertices[:, 1] >= y_min) & (proj_vertices[:, 1] <= y_max))
-        #print(f'vertex_indices: {list(vertex_indices)}')
-        return vertex_indices
-
-    def _project_all_vertices(self, mvp_matrix: QMatrix4x4) -> np.array:
-        vertices = self._mesh.vertices
-        n = len(vertices)
-        vertices_matrix = np.vstack([np.transpose(vertices), np.full(n, 1.0)])
-
-        m = np.array([[mvp_matrix[0, 0], mvp_matrix[0, 1], mvp_matrix[0, 2], mvp_matrix[0, 3]],
-                      [mvp_matrix[1, 0], mvp_matrix[1, 1], mvp_matrix[1, 2], mvp_matrix[1, 3]],
-                      [mvp_matrix[2, 0], mvp_matrix[2, 1], mvp_matrix[2, 2], mvp_matrix[2, 3]],
-                      [mvp_matrix[3, 0], mvp_matrix[3, 1], mvp_matrix[3, 2], mvp_matrix[3, 3]]])
-
-        x1_vec, y1_vec, z1_vec, w1_vec = m @ vertices_matrix
-        width2 = self._view_size[0] / 2.0
-        height2 = self._view_size[1] / 2.0
-        x2_vec = width2 + x1_vec / z1_vec * width2
-        y2_vec = height2 - y1_vec / z1_vec * height2
-
-        if len(self._selected_vertex_indices) > 0:
-            i = self._selected_vertex_indices[0]  # take only one
-            print(f'sel_transformed: {x2_vec[i]}, {y2_vec[i]}, {z1_vec[i]}')
-
-        return np.array([x2_vec, y2_vec, z1_vec])
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
@@ -184,12 +150,6 @@ class OpenGlWin(QOpenGLWidget):
         if event.button() == Qt.RightButton:
             self._mouse_data.last_position = mouse_pos
             self._mouse_data.is_right_button_pressed = True
-        elif event.button() == Qt.LeftButton:
-            model_matrix = self._create_eye_matrix()
-            view_matrix = self._camera.create_view_matrix()
-            mvp_matrix = self._projection_matrix * view_matrix * model_matrix
-            sel_vertex_indices = self._find_vertex_indices_at_mouse(mouse_pos, mvp_matrix)
-            pass
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.RightButton:
