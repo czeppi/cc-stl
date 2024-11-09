@@ -14,7 +14,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
-#from itemdetectoratmousepos import ItemDetectorAtMousePos
+from itemdetectoratmousepos import ItemDetectorAtMousePos
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 
@@ -121,8 +121,8 @@ class OpenGlWin(QOpenGLWidget):
         view_matrix = self._camera.create_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
 
-        # item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
-        # cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
+        item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
+        cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
 
         if len(self._selected_vertex_indices) > 0:
             self._vertices_shader_program.set_selected_vertices(self._selected_vertex_indices)
