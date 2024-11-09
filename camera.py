@@ -88,3 +88,16 @@ class Camera:
             0, 0, 0, 1
         )
         return m
+
+    def create_perspective_matrix(self, aspect_ratio) -> QMatrix4x4:
+        fov = self._fov
+        near = 0.1
+        far = 500.0
+
+        f = 1.0 / np.tan(np.radians(fov) / 2)
+        return QMatrix4x4(
+            f / aspect_ratio, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
+            0, 0, -1, 0
+        )

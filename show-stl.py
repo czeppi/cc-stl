@@ -17,8 +17,13 @@ from camera import Camera
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 
-STL_PATH = "KLP_Lame_Tilted.stl"
-#STL_PATH = "charybdisnano_v2_v187.stl"
+STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
+#STL_PATH = "stl-files/charybdisnano_v2_v187.stl"
+#STL_PATH = "stl-files/adapter_v2_bottom_pmw_3389.stl"
+
+GL_BACKGROUND_COLOR = [1.0, 1.0, 1.0]
+GL_VIEW_SIZE = 1200, 900
+
 SELECTED_VERTEX_INDICES = [20000]
 
 
@@ -79,7 +84,7 @@ class OpenGlWin(QOpenGLWidget):
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glClearColor(1.0, 1.0, 1.0,1.0)
+        glClearColor(*GL_BACKGROUND_COLOR,1.0)
 
     @staticmethod
     def _create_positions_vbo_buffer(vertices: np.array) -> QOpenGLBuffer:
@@ -105,7 +110,7 @@ class OpenGlWin(QOpenGLWidget):
         glViewport(0, 0, width, height)
 
         aspect_ratio = width / height
-        self._projection_matrix = self._create_perspective_matrix(self._camera.fov, aspect_ratio, 0.1, 500.0)
+        self._projection_matrix = self._camera.create_perspective_matrix(aspect_ratio)
         self._view_size = width, height
 
     def paintGL(self):
@@ -139,38 +144,6 @@ class OpenGlWin(QOpenGLWidget):
         #print(f'vertex_indices: {list(vertex_indices)}')
         return vertex_indices
 
-    # def _print_sel_vertices_info(self, mvp_matrix: QMatrix4x4) -> None:
-    #     if len(self._selected_vertex_indices) == 0:
-    #         return
-    #
-    #     vertex_index = self._selected_vertex_indices[0]  # take only one
-    #     vertex_pos = self._mesh.vertices[vertex_index]
-    #     vertex_pos4d = np.array([vertex_pos[0], vertex_pos[1], vertex_pos[2], 1])
-    #
-    #     m = np.array([[mvp_matrix[0,0], mvp_matrix[0,1], mvp_matrix[0,2], mvp_matrix[0,3]],
-    #                   [mvp_matrix[1,0], mvp_matrix[1,1], mvp_matrix[1,2], mvp_matrix[1,3]],
-    #                   [mvp_matrix[2,0], mvp_matrix[2,1], mvp_matrix[2,2], mvp_matrix[2,3]],
-    #                   [mvp_matrix[3,0], mvp_matrix[3,1], mvp_matrix[3,2], mvp_matrix[3,3]]])
-    #
-    #     vertex_pos_transformed = m @ vertex_pos4d
-    #     x1, y1, z1, w1 = vertex_pos_transformed
-    #     w, h = self._view_size
-    #     x = (w / 2) + x1 / z1 * (w / 2)
-    #     y = (h / 2) - y1 / z1 * (h / 2)
-    #     print(f'{vertex_pos4d}, {x, y}')
-    #
-    #     self._transform_all_vertices(mvp_matrix)
-    #
-    # def _transform_all_vertices(self, mvp_matrix: QMatrix4x4) -> None:
-    #     if len(self._selected_vertex_indices) == 0:
-    #         return
-    #
-    #     x_vec, y_vec, z_vec = self._project_all_vertices(mvp_matrix)
-    #
-    #     i = self._selected_vertex_indices[0]  # take only one
-    #     print(f'sel_transformed: {x_vec[i]}, {y_vec[i]}, {z_vec[i]}')
-    #     print()
-
     def _project_all_vertices(self, mvp_matrix: QMatrix4x4) -> np.array:
         vertices = self._mesh.vertices
         n = len(vertices)
@@ -200,16 +173,6 @@ class OpenGlWin(QOpenGLWidget):
             0, 1, 0, 0,
             0, 0, 1, 0,
             0, 0, 0, 1
-        )
-
-    @staticmethod
-    def _create_perspective_matrix(fov, aspect, near, far) -> QMatrix4x4:
-        f = 1.0 / np.tan(np.radians(fov) / 2)
-        return QMatrix4x4(
-            f / aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
-            0, 0, -1, 0
         )
 
     def mousePressEvent(self, event):
@@ -258,7 +221,7 @@ class OpenGlWin(QOpenGLWidget):
 
         width, height = self._view_size
         aspect_ratio = width / height
-        self._projection_matrix = self._create_perspective_matrix(self._camera.fov, aspect_ratio, 0.1, 500.0)
+        self._projection_matrix = self._camera.create_perspective_matrix(aspect_ratio)
 
         self.update()  # update screen
 
@@ -268,7 +231,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("STL Example")
-        self.setFixedSize(1200, 900)
+        self.setFixedSize(*GL_VIEW_SIZE)
         self._open_gl_widget = OpenGlWin(stl_path=STL_PATH, parent=self)
         self.setCentralWidget(self._open_gl_widget)
 

@@ -12,6 +12,10 @@ from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLShader, QOpenGLVertexA
 
 from camera import Camera
 
+
+GL_OBJECT_COLOR = 0.4, 0.4, 0.8
+
+
 FACES_VERTEX_SHADER_SRC = """
     #version 330 core
     layout(location = 0) in vec3 position;
@@ -140,7 +144,7 @@ class FacesShaderProgram(ShaderProgram):
         # set light parameters
         prg.setUniformValue("ambientColor", QVector3D(1.0, 1.0, 1.0))
         #prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        prg.setUniformValue("objectColor", QVector3D(0.4, 0.4, 0.8))  # object color
+        prg.setUniformValue("objectColor", QVector3D(*GL_OBJECT_COLOR))  # object color
 
         vao.release()
         normals_vbo.release()
