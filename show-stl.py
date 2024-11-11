@@ -56,7 +56,7 @@ class OpenGlWin(QOpenGLWidget):
 
     def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
         mesh = trimesh.load(stl_path)
-        self._rotate_mesh_90degree_around_x_axis(mesh)
+        #self._rotate_mesh_90degree_around_x_axis(mesh)
         return mesh
 
     @staticmethod
@@ -159,7 +159,7 @@ class OpenGlWin(QOpenGLWidget):
             sensitivity = self._camera.distance / 200
 
             delta = mouse_pos - self._mouse_data.last_position
-            d_azimuth = -delta.x() * sensitivity
+            d_azimuth = delta.x() * sensitivity
             d_elevation = delta.y() * sensitivity
 
             self._camera.azimuth += d_azimuth

@@ -54,37 +54,35 @@ class Camera:
         elevation_rad = np.radians(self.elevation)
         azimuth_rad = np.radians(self.azimuth)
         x = self.distance * np.cos(elevation_rad) * np.sin(azimuth_rad)
-        y = self.distance * np.sin(elevation_rad)
-        z = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        y = self.distance * np.cos(elevation_rad) * np.cos(azimuth_rad)
+        z = self.distance * np.sin(elevation_rad)
         return x, y, z
 
     @staticmethod
     def _calc_distance_azimuth_elevation(x: float, y: float, z: float) -> Tuple[float, float, float]:
         distance = math.hypot(x, y, z)
-        xz = math.hypot(x, z)
-        elevation = 180 / math.pi * math.atan(y / xz)
-        azimuth = 180 / math.pi * math.atan2(x, z)
+        xy = math.hypot(x, y)
+        elevation = 180 / math.pi * math.atan(z / xy)
+        azimuth = 180 / math.pi * math.atan2(x, y)
         return distance, azimuth, elevation
 
     def create_view_matrix(self) -> QMatrix4x4:
-        """ cals view matrix in dependency of the camera
-        """
         eye = np.array(self.xyz, dtype=np.float32)
-        up_vector = np.array([0, 1, 0], dtype=np.float32)
+        up_vector = np.array([0, 0, 1], dtype=np.float32)
 
-        z_axis = 1 * eye
-        z_axis /= np.linalg.norm(z_axis)
+        y_axis = 1 * eye
+        y_axis /= np.linalg.norm(y_axis)
 
-        x_axis = np.cross(up_vector, z_axis)
+        x_axis = np.cross(up_vector, y_axis)
         x_axis /= np.linalg.norm(x_axis)
 
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis /= np.linalg.norm(y_axis)
+        z_axis = np.cross(y_axis, x_axis)
+        z_axis /= np.linalg.norm(z_axis)
 
         m = QMatrix4x4(
             x_axis[0], x_axis[1], x_axis[2], -np.dot(x_axis, eye),
-            y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
             z_axis[0], z_axis[1], z_axis[2], -np.dot(z_axis, eye),
+            y_axis[0], y_axis[1], y_axis[2], -np.dot(y_axis, eye),
             0, 0, 0, 1
         )
         return m
