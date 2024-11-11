@@ -295,7 +295,6 @@ class VerticesShaderProgram(ShaderProgram):
         self._selected_indices = selected_indices
 
     def paint(self, mvp_matrix: np.array) -> None:
-        print(f'vertex-print: #sel={len(self._selected_indices)}')
         if len(self._selected_indices) == 0:
             return
 
