@@ -13,7 +13,8 @@ from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLShader, QOpenGLVertexA
 from camera import Camera
 
 
-GL_OBJECT_COLOR = 0.4, 0.4, 0.8
+DEFAULT_FACET_COLOR = 0.4, 0.4, 0.8
+DEFAULT_EDGE_COLOR = 0.0, 0.0, 0.0
 ColorTuple = Tuple[float, float, float]  # all values in [0, 1]
 
 
@@ -69,9 +70,11 @@ EDGES_VERTEX_SHADER_SRC = """
 
 EDGES_FRAGMENT_SHADER_SRC = """
     #version 330
+    uniform vec3 edgeColor; 
+        
     out vec4 fragColor;
     void main() {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);  // blck
+        fragColor = vec4(edgeColor, 1.0);  // blck
     }
 """
 
@@ -145,7 +148,7 @@ class FacesShaderProgram(ShaderProgram):
         # set light parameters
         prg.setUniformValue("ambientColor", QVector3D(1.0, 1.0, 1.0))
         #prg.setUniformValue("ambientColor", QVector3D(0.5, 0.5, 0.5))  # Gedimmtes Umgebungslicht
-        prg.setUniformValue("objectColor", QVector3D(*GL_OBJECT_COLOR))  # object color
+        prg.setUniformValue("objectColor", QVector3D(*DEFAULT_FACET_COLOR))  # object color
 
         vao.release()
         normals_vbo.release()
@@ -170,22 +173,21 @@ class FacesShaderProgram(ShaderProgram):
         prg = self._gl_program
         vao = self._vao
 
+        ebo_array = np.array(self._mesh.faces, dtype=np.uint32)
         if face_index_array is not None and len(face_index_array) > 0:
-            faces = np.array(self._mesh.faces, dtype=np.uint32)
-            ebo_array = faces[face_index_array]
+            ebo_array = ebo_array[face_index_array]
 
-            ebo = self._ebo
-            ebo.bind()
-
-            ebo.allocate(ebo_array.tobytes(), ebo_array.nbytes)
-            ebo.release()
+        ebo = self._ebo
+        ebo.bind()
+        ebo.allocate(ebo_array.tobytes(), ebo_array.nbytes)
+        ebo.release()
 
         prg.bind()
         prg.setUniformValue("mvp_matrix", mvp_matrix)
         prg.setUniformValue("cameraPos", QVector3D(*camera.xyz))
 
         if color is None:
-            color = GL_OBJECT_COLOR
+            color = DEFAULT_FACET_COLOR
         prg.setUniformValue("objectColor", QVector3D(*color))
 
         vao.bind()
@@ -238,9 +240,20 @@ class EdgesShaderProgram(ShaderProgram):
         ebo.release()
         return ebo
 
-    def paint(self, mvp_matrix: np.array) -> None:
+    def paint(self, mvp_matrix: np.array,
+              color: Optional[ColorTuple]=None,
+              edge_index_array: Optional[np.array]=None) -> None:
         prg = self._gl_program
         vao = self._vao
+
+        ebo_array = self._edges_array
+        if edge_index_array is not None and len(edge_index_array) > 0:
+            ebo_array = ebo_array[edge_index_array]
+
+        ebo = self._ebo
+        ebo.bind()
+        ebo.allocate(ebo_array.tobytes(), ebo_array.nbytes)
+        ebo.release()
 
         #glDepthMask(GL_FALSE)  # depth buffer writing deactivate
         #glEnable(GL_POLYGON_OFFSET_LINE)  # no effect
@@ -249,6 +262,11 @@ class EdgesShaderProgram(ShaderProgram):
 
         prg.bind()
         prg.setUniformValue("mvp_matrix", mvp_matrix)
+
+        if color is None:
+            color = DEFAULT_EDGE_COLOR
+        prg.setUniformValue("edgeColor", QVector3D(*color))
+
         vao.bind()
 
         glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)

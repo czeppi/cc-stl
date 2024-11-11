@@ -120,34 +120,43 @@ class OpenGlWin(QOpenGLWidget):
 
         item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=mvp_matrix, view_size=self._view_size)
         cur_item = item_detector.find_cur_item(self._mouse_data.last_position)
-        if cur_item:
-            print(f'cur item: {cur_item.type}: {cur_item.index}')
-        else:
-            print(f'cur item: - ')
-
-        selected_vertex_indices = item_detector._find_vertex_indices_at_mouse(self._mouse_data.last_position)
-        #print(f'selected_vertex_indices={selected_vertex_indices}')
-        self._vertices_shader_program.set_selected_vertices(selected_vertex_indices)
 
         # paint
         num_faces = len(self._mesh.faces)
-        face_index_list = np.arange(num_faces).tolist()
+        face_index_array = np.arange(num_faces)
         if cur_item and cur_item.type == MeshItemType.FACE:
-            face_index_list.remove(cur_item.index)
-            face_index_array = np.array(face_index_list)
+            face_index_array = np.delete(face_index_array, np.where(face_index_array == cur_item.index))
             self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
                                              face_index_array=face_index_array)
 
             face_index_array = np.array([cur_item.index])
             self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
-                                             face_index_array=face_index_array, color=(0.0, 1.0, 0.0))
+                                             face_index_array=face_index_array,
+                                             color=(0.0, 1.0, 0.0))
         else:
-            face_index_array = np.array(face_index_list)
             self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
                                              face_index_array=face_index_array)
 
+        num_edges = len(self._mesh.edges_unique)
+        edge_index_array = np.arange(num_edges)
+        if cur_item and cur_item.type == MeshItemType.EDGE:
+            edge_index_array = np.delete(edge_index_array, np.where(edge_index_array == cur_item.index))
+            self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
+                                             edge_index_array=edge_index_array)
+
+            edge_index_array = np.array([cur_item.index])
+            self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
+                                             edge_index_array=edge_index_array,
+                                             color=(0.0, 1.0, 0.0))
+        else:
+            self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
+                                             edge_index_array=edge_index_array)
+
         self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
-        self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
+
+        if cur_item and cur_item.type == MeshItemType.VERTEX:
+            self._vertices_shader_program.set_selected_vertices([cur_item.index])
+            self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
