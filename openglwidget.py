@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
@@ -11,16 +10,11 @@ from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QMatrix4x4, QWindow
 from PySide6.QtOpenGL import QOpenGLBuffer
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
-from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
 from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
-
-STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
-#STL_PATH = "stl-files/charybdisnano_v2_v187.stl"
-#STL_PATH = "stl-files/adapter_v2_bottom_pmw_3389.stl"
 
 GL_BACKGROUND_COLOR = [1.0, 1.0, 1.0]
 GL_VIEW_SIZE = 1200, 900
@@ -34,9 +28,9 @@ class MouseData:
 
 class OpenGlWin(QOpenGLWidget):
 
-    def __init__(self, stl_path: str, parent: QWindow):
+    def __init__(self, mesh: trimesh.Trimesh, parent: QWindow):
         super().__init__()
-        self._mesh = self._read_mesh(stl_path)
+        self._mesh = mesh
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
@@ -53,11 +47,6 @@ class OpenGlWin(QOpenGLWidget):
         self._mouse_data = MouseData()
 
         self.setMouseTracking(True)
-
-    def _read_mesh(self, stl_path: str) -> trimesh.Trimesh:
-        mesh = trimesh.load(stl_path)
-        #self._rotate_mesh_90degree_around_x_axis(mesh)
-        return mesh
 
     @staticmethod
     def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
@@ -210,20 +199,3 @@ class OpenGlWin(QOpenGLWidget):
         self._projection_matrix = self._camera.create_perspective_matrix(aspect_ratio)
 
         self.update()  # update screen
-
-
-class MainWindow(QMainWindow):
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("STL Example")
-        self.setFixedSize(*GL_VIEW_SIZE)
-        self._open_gl_widget = OpenGlWin(stl_path=STL_PATH, parent=self)
-        self.setCentralWidget(self._open_gl_widget)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    main_window = MainWindow()
-    main_window.show()
-    sys.exit(app.exec())
