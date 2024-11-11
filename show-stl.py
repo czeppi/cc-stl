@@ -14,7 +14,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from camera import Camera
-from itemdetectoratmousepos import ItemDetectorAtMousePos
+from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 
@@ -130,7 +130,22 @@ class OpenGlWin(QOpenGLWidget):
         self._vertices_shader_program.set_selected_vertices(selected_vertex_indices)
 
         # paint
-        self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix)
+        num_faces = len(self._mesh.faces)
+        face_index_list = np.arange(num_faces).tolist()
+        if cur_item and cur_item.type == MeshItemType.FACE:
+            face_index_list.remove(cur_item.index)
+            face_index_array = np.array(face_index_list)
+            self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
+                                             face_index_array=face_index_array)
+
+            face_index_array = np.array([cur_item.index])
+            self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
+                                             face_index_array=face_index_array, color=(0.0, 1.0, 0.0))
+        else:
+            face_index_array = np.array(face_index_list)
+            self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
+                                             face_index_array=face_index_array)
+
         self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
         self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 import numpy as np
 import trimesh
@@ -14,6 +14,7 @@ from camera import Camera
 
 
 GL_OBJECT_COLOR = 0.4, 0.4, 0.8
+ColorTuple = Tuple[float, float, float]  # all values in [0, 1]
 
 
 FACES_VERTEX_SHADER_SRC = """
@@ -153,7 +154,7 @@ class FacesShaderProgram(ShaderProgram):
         prg.release()
 
     def _create_ebo(self) -> QOpenGLBuffer:
-        faces = np.array(self._mesh.faces, dtype=np.uint32)
+        faces = np.array(self._mesh.faces, dtype=np.uint32)  # important!
 
         ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
         ebo.create()
@@ -163,13 +164,29 @@ class FacesShaderProgram(ShaderProgram):
         ebo.release()
         return ebo
 
-    def paint(self, camera: Camera, mvp_matrix: np.array) -> None:
+    def paint(self, camera: Camera, mvp_matrix: np.array,
+              color: Optional[ColorTuple]=None,
+              face_index_array: Optional[np.array]=None) -> None:
         prg = self._gl_program
         vao = self._vao
+
+        if face_index_array is not None and len(face_index_array) > 0:
+            faces = np.array(self._mesh.faces, dtype=np.uint32)
+            ebo_array = faces[face_index_array]
+
+            ebo = self._ebo
+            ebo.bind()
+
+            ebo.allocate(ebo_array.tobytes(), ebo_array.nbytes)
+            ebo.release()
 
         prg.bind()
         prg.setUniformValue("mvp_matrix", mvp_matrix)
         prg.setUniformValue("cameraPos", QVector3D(*camera.xyz))
+
+        if color is None:
+            color = GL_OBJECT_COLOR
+        prg.setUniformValue("objectColor", QVector3D(*color))
 
         vao.bind()
 
