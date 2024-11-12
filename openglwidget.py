@@ -15,7 +15,7 @@ from camera import Camera
 from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType, MeshItemKey
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
-GL_BACKGROUND_COLOR = [1.0, 1.0, 1.0]
+GL_BACKGROUND_COLOR = 3 * [0.75]
 GL_VIEW_SIZE = 1200, 900
 
 
@@ -33,10 +33,10 @@ class OpenGlWinHandlers:
 
 class OpenGlWin(QOpenGLWidget):
 
-    def __init__(self, mesh: trimesh.Trimesh, handlers: OpenGlWinHandlers):
+    def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
         self._mesh = mesh
-        self._handlers = handlers
+        self._handlers: Optional[OpenGlWinHandlers] = None
         self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
@@ -54,6 +54,9 @@ class OpenGlWin(QOpenGLWidget):
         self._cur_mesh_item: Optional[MeshItemKey] = None
 
         self.setMouseTracking(True)
+
+    def set_handlers(self, handlers: OpenGlWinHandlers) -> None:
+        self._handlers = handlers
 
     @staticmethod
     def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
@@ -175,7 +178,7 @@ class OpenGlWin(QOpenGLWidget):
         if event.button() == Qt.RightButton:
             self._mouse_data.is_right_button_pressed = False
         elif event.button() == Qt.LeftButton:
-            if self._cur_mesh_item:
+            if self._cur_mesh_item and self._handlers:
                 self._handlers.change_sel_items([self._cur_mesh_item])
 
     def mouseMoveEvent(self, event):
@@ -202,7 +205,8 @@ class OpenGlWin(QOpenGLWidget):
             if new_mesh_item != self._cur_mesh_item:
                 self._cur_mesh_item = new_mesh_item
                 self.update()  # update screen, for selected elements
-                self._handlers.change_cur_item(new_mesh_item)
+                if self._handlers:
+                    self._handlers.change_cur_item(new_mesh_item)
 
     def wheelEvent(self, event):
         zoom_factor = 0.9 if event.angleDelta().y() > 0 else 1.1

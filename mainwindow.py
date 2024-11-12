@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, List
+from cProfile import label
+from typing import Callable, List, Optional
 
 import trimesh
 from PySide6.QtGui import QAction
@@ -63,9 +64,9 @@ class Splitter3D(QSplitter):
 
         self._mesh = mesh
 
-        self._opengl_widget = self._create_opengl_widget(self._mesh)
-        self._label_widget = QLabel(parent=self)
-        self._label_widget.setText('hallo')
+        self._opengl_widget = OpenGlWin(mesh=mesh)
+        self._label_widget = OpenGlInfoWin(mesh=mesh)
+        self._set_handlers()
 
         self.addWidget(self._opengl_widget)
         self.addWidget(self._label_widget)
@@ -73,13 +74,33 @@ class Splitter3D(QSplitter):
         self.setStretchFactor(0, 1)
         self.setStretchFactor(1, 0)
 
-    def _create_opengl_widget(self, mesh: trimesh.Trimesh) -> OpenGlWin:
-        handlers = OpenGlWinHandlers(change_cur_item=self.on_opengl_change_cur_item,
-                                     change_sel_items=self.on_opengl_change_sel_items)
-        return OpenGlWin(mesh=mesh, handlers=handlers)
+    def _set_handlers(self) -> None:
+        handlers = OpenGlWinHandlers(change_cur_item=self._label_widget.on_opengl_change_cur_item,
+                                     change_sel_items=self._label_widget.on_opengl_change_sel_items)
+        self._opengl_widget.set_handlers(handlers)
 
-    def on_opengl_change_cur_item(self, cur_item: MeshItemKey) -> None:
-        print(f'on_opengl_change_cur_item: {cur_item}')
+
+class OpenGlInfoWin(QLabel):
+
+    def __init__(self, mesh: trimesh.Trimesh):
+        super().__init__()
+        self._mesh = mesh
+
+    def on_opengl_change_cur_item(self, cur_item: Optional[MeshItemKey]) -> None:
+        if cur_item is None:
+            label = ''
+        elif cur_item.type == MeshItemType.VERTEX:
+            mesh_vertex = self._mesh.vertices[cur_item.index]
+            x, y, z = mesh_vertex
+            label = f'vertex[{cur_item.index}]:\n({x:.3f}, {y:.3f}, {z:.3f})'
+        elif cur_item.type == MeshItemType.EDGE:
+            label = f'edge[{cur_item.index}]'
+        elif cur_item.type == MeshItemType.FACE:
+            label = f'face[{cur_item.index}]'
+        else:
+            label = ''
+
+        self.setText(label)
 
     def on_opengl_change_sel_items(self, new_sel_items: List[MeshItemKey]) -> None:
         print(f'on_opengl_change_sel_items: {new_sel_items}')
