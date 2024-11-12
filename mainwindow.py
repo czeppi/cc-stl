@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable
+from typing import Callable, List
 
 import trimesh
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QLabel, QFileDialog
 
-from openglwidget import GL_VIEW_SIZE, OpenGlWin
-
+from itemdetectoratmousepos import MeshItemType, MeshItemKey
+from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
 
 STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
 #STL_PATH = "stl-files/charybdisnano_v2_v187.stl"
@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
 
         self._add_menubar()
 
-        self._splitter = MainSplitter(self._mesh)
+        self._splitter = Splitter3D(self._mesh)
         self.setCentralWidget(self._splitter)
 
     def _add_menubar(self):
@@ -56,22 +56,33 @@ class MainWindow(QMainWindow):
             return
 
 
-class MainSplitter(QSplitter):
+class Splitter3D(QSplitter):
 
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
 
         self._mesh = mesh
 
-        self._open_gl_widget = OpenGlWin(mesh= self._mesh, parent=self)
+        self._opengl_widget = self._create_opengl_widget(self._mesh)
         self._label_widget = QLabel(parent=self)
         self._label_widget.setText('hallo')
 
-        self.addWidget(self._open_gl_widget)
+        self.addWidget(self._opengl_widget)
         self.addWidget(self._label_widget)
 
         self.setStretchFactor(0, 1)
         self.setStretchFactor(1, 0)
+
+    def _create_opengl_widget(self, mesh: trimesh.Trimesh) -> OpenGlWin:
+        handlers = OpenGlWinHandlers(change_cur_item=self.on_opengl_change_cur_item,
+                                     change_sel_items=self.on_opengl_change_sel_items)
+        return OpenGlWin(mesh=mesh, handlers=handlers)
+
+    def on_opengl_change_cur_item(self, cur_item: MeshItemKey) -> None:
+        print(f'on_opengl_change_cur_item: {cur_item}')
+
+    def on_opengl_change_sel_items(self, new_sel_items: List[MeshItemKey]) -> None:
+        print(f'on_opengl_change_sel_items: {new_sel_items}')
 
 
 if __name__ == "__main__":
