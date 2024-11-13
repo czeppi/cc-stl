@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 from typing import Tuple, Iterator
 
-from scipy.special import powm1
+EPS = 1E-6
 
 
 @dataclass
@@ -52,6 +52,22 @@ class ProjEdge:
             closest_x, closest_y = x2, y2
 
         return math.hypot(x - closest_x, y - closest_y)
+
+    def calc_z_at_xy(self, x: float, y: float) -> float:
+        x1, y1, z1 = self.p1.xyz
+        x2, y2, z2 = self.p2.xyz
+        dx = x2 - x1
+        dy = y2 - y1
+        dz = z2 - z1
+
+        if abs(dx) > abs(dy):
+            assert abs(dx) >= EPS
+            z = z1 + dz / dx * (x - x1)
+        else:
+            assert abs(dy) >= EPS
+            z = z1 + dz / dy * (y - y1)
+
+        return z
 
 
 @dataclass
@@ -108,11 +124,43 @@ class ProjTriangle:
 
         return True
 
-    def cover_edge(self, edge: ProjEdge) -> bool:
-        if edge.z <= self.z:
+    def cover_edge_at_xy(self, edge: ProjEdge, x: float, y: float) -> bool:
+        edge_z = edge.calc_z_at_xy(x, y)
+        self_z = self.calc_z_at_xy(x, y)
+        if edge_z <= self_z:
             return False  # edge is nearer
 
         if {edge.p1.index, edge.p2.index} < {p.index for p in self.points}:
             return False  # edge belongs to triangle
 
         return True
+
+    def calc_z_at_xy(self, x: float, y: float) -> float:
+        x1, y1, z1 = self.p1.xyz
+        x2, y2, z2 = self.p2.xyz
+        x3, y3, z3 = self.p3.xyz
+
+        dx21 = x2 - x1
+        dy21 = y2 - y1
+        dz21 = z2 - z1
+
+        dx31 = x3 - x1
+        dy31 = y3 - y1
+        dz31 = z3 - z1
+
+        if abs(dx21) > abs(dx31):
+            assert abs(dx21) >= EPS
+            mx =  dz21 / dx21
+        else:
+            assert abs(dx31) >= EPS
+            mx = dz31 / dx31
+
+        if abs(dy21) > abs(dy31):
+            assert abs(dy21) >= EPS
+            my = dz21 / dy21
+        else:
+            assert abs(dy31) >= EPS
+            my = dz31 / dy31
+
+        z = z1 + mx * (x - x1) + my * (y - y1)
+        return z

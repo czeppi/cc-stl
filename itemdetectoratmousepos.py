@@ -181,7 +181,7 @@ class ItemDetectorAtMousePos:
 
             mouse_dist = proj_edge.calc_dist_to_point(mouse_x, mouse_y)
             if mouse_dist <= MOUSE_EDGE_DIST:
-                if nearest_triangle is None or not nearest_triangle.cover_edge(proj_edge):
+                if nearest_triangle is None or not nearest_triangle.cover_edge_at_xy(proj_edge, x=mouse_x, y=mouse_y):
                     yield proj_edge
 
     def _create_proj_vertex_from_numpy_vertex(self, index: int) -> ProjVertex:

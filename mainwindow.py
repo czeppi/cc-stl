@@ -81,6 +81,38 @@ class Splitter3D(QSplitter):
 
 
 class OpenGlInfoWin(QLabel):
+    """
+    No cur item:
+      - Button "show recocnized faces"
+      - Button "show recocnized polylines"
+
+    cur item is face:
+      - show index, norm angles + dist. to source
+      if level/floor:
+        - buttons: "show connected", "show whole", "show all ortho"
+      elif sphere:
+        - show center + radius
+        - buttons: "show connected", "show whole sphere", "show all sphere with same radius"
+      elif cylinder (tube etc.):
+        - show axis + radius
+        - buttons: "show whole cylinder", "show all cylinders with same radius", "show all sphere with same radius"
+
+    cur item is edge:
+      - show index, start point, end point, length, delta
+      - show level (if polyline)
+      - button "show polyline"
+      if line:
+        - buttons: "show connected", "show whole line", "show all parallels", "show all orthogonals"
+      elif circle:
+        - show center, radius
+        - buttons: "show connected", "show whole cirle", "show all parallels", "show all same radius"
+      elif bezier:
+        - show parameters
+        - buttons: "show connected", "show whole bezier", "show all parallels", "show congruent"
+
+    cur item == vertex:
+      - show: index, position
+    """
 
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
