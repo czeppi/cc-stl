@@ -27,6 +27,7 @@ class MouseData:
 
 @dataclass
 class OpenGlWinHandlers:
+    change_camera_pos: Callable[[Camera], None]
     change_cur_item: Callable[[MeshItemKey], None]
     change_sel_items: Callable[[List[MeshItemKey]], None]
 
@@ -196,6 +197,9 @@ class OpenGlWin(QOpenGLWidget):
             self._mouse_data.last_position = mouse_pos
             self._mvp_matrix = self._calc_mvp_matrix()
             self.update()  # update screen
+
+            if self._handlers:
+                self._handlers.change_camera_pos(self._camera)
         else:
             self._mouse_data.last_position = mouse_pos
 
@@ -205,6 +209,7 @@ class OpenGlWin(QOpenGLWidget):
             if new_mesh_item != self._cur_mesh_item:
                 self._cur_mesh_item = new_mesh_item
                 self.update()  # update screen, for selected elements
+
                 if self._handlers:
                     self._handlers.change_cur_item(new_mesh_item)
 
@@ -223,3 +228,6 @@ class OpenGlWin(QOpenGLWidget):
         self._mvp_matrix = self._calc_mvp_matrix()
 
         self.update()  # update screen
+
+        if self._handlers:
+            self._handlers.change_camera_pos(self._camera)

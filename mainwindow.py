@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import sys
-from cProfile import label
-from typing import Callable, List, Optional
+from typing import Callable
 
 import trimesh
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QLabel, QFileDialog
+from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog
 
-from itemdetectoratmousepos import MeshItemType, MeshItemKey
+from meshinfowin import MeshInfoWin
 from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
 
 STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
@@ -65,77 +64,22 @@ class Splitter3D(QSplitter):
         self._mesh = mesh
 
         self._opengl_widget = OpenGlWin(mesh=mesh)
-        self._label_widget = OpenGlInfoWin(mesh=mesh)
+        self._mesh_info_win = MeshInfoWin(mesh=mesh)
         self._set_handlers()
 
         self.addWidget(self._opengl_widget)
-        self.addWidget(self._label_widget)
+        self.addWidget(self._mesh_info_win)
+
+        self.setSizes([1, 200])
 
         self.setStretchFactor(0, 1)
         self.setStretchFactor(1, 0)
 
     def _set_handlers(self) -> None:
-        handlers = OpenGlWinHandlers(change_cur_item=self._label_widget.on_opengl_change_cur_item,
-                                     change_sel_items=self._label_widget.on_opengl_change_sel_items)
+        handlers = OpenGlWinHandlers(change_camera_pos=self._mesh_info_win.on_opengl_change_camera_pos,
+                                     change_cur_item=self._mesh_info_win.on_opengl_change_cur_item,
+                                     change_sel_items=self._mesh_info_win.on_opengl_change_sel_items)
         self._opengl_widget.set_handlers(handlers)
-
-
-class OpenGlInfoWin(QLabel):
-    """
-    No cur item:
-      - Button "show recocnized faces"
-      - Button "show recocnized polylines"
-
-    cur item is face:
-      - show index, norm angles + dist. to source
-      if level/floor:
-        - buttons: "show connected", "show whole", "show all ortho"
-      elif sphere:
-        - show center + radius
-        - buttons: "show connected", "show whole sphere", "show all sphere with same radius"
-      elif cylinder (tube etc.):
-        - show axis + radius
-        - buttons: "show whole cylinder", "show all cylinders with same radius", "show all sphere with same radius"
-
-    cur item is edge:
-      - show index, start point, end point, length, delta
-      - show level (if polyline)
-      - button "show polyline"
-      if line:
-        - buttons: "show connected", "show whole line", "show all parallels", "show all orthogonals"
-      elif circle:
-        - show center, radius
-        - buttons: "show connected", "show whole cirle", "show all parallels", "show all same radius"
-      elif bezier:
-        - show parameters
-        - buttons: "show connected", "show whole bezier", "show all parallels", "show congruent"
-
-    cur item == vertex:
-      - show: index, position
-    """
-
-    def __init__(self, mesh: trimesh.Trimesh):
-        super().__init__()
-        self._mesh = mesh
-
-    def on_opengl_change_cur_item(self, cur_item: Optional[MeshItemKey]) -> None:
-        if cur_item is None:
-            label = ''
-        elif cur_item.type == MeshItemType.VERTEX:
-            mesh_vertex = self._mesh.vertices[cur_item.index]
-            x, y, z = mesh_vertex
-            label = f'vertex[{cur_item.index}]:\n({x:.3f}, {y:.3f}, {z:.3f})'
-        elif cur_item.type == MeshItemType.EDGE:
-            label = f'edge[{cur_item.index}]'
-        elif cur_item.type == MeshItemType.FACE:
-            label = f'face[{cur_item.index}]'
-        else:
-            label = ''
-
-        self.setText(label)
-
-    def on_opengl_change_sel_items(self, new_sel_items: List[MeshItemKey]) -> None:
-        print(f'on_opengl_change_sel_items: {new_sel_items}')
 
 
 if __name__ == "__main__":
