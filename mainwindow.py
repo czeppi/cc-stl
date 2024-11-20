@@ -61,8 +61,6 @@ class Splitter3D(QSplitter):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
 
-        self._mesh = mesh
-
         self._opengl_widget = OpenGlWin(mesh=mesh)
         self._mesh_info_win = MeshInfoWin(mesh=mesh)
         self._set_handlers()

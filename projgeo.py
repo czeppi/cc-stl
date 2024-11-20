@@ -30,10 +30,6 @@ class ProjEdge:
     def points(self) -> Tuple[ProjVertex, ProjVertex]:
         return self.p1, self.p2
 
-    @property
-    def z(self) -> float:
-        return (self.p1.z + self.p2.z) / 2
-
     def calc_dist_to_point(self, x: float, y: float) -> float:
         x1, y1 = self.p1.x, self.p1.y
         x2, y2 = self.p2.x, self.p2.y
@@ -81,10 +77,6 @@ class ProjTriangle:
     def points(self) -> Tuple[ProjVertex, ProjVertex, ProjVertex]:
         return self.p1, self.p2, self.p3
 
-    @property
-    def z(self) -> float:
-        return (self.p1.z + self.p2.z + self.p3.z) / 3
-
     def contains_point(self, x: float, y: float) -> bool:
         x1, y1 = self.p1.x, self.p1.y
         x2, y2 = self.p2.x, self.p2.y
@@ -111,12 +103,12 @@ class ProjTriangle:
         x3, y3 = p3
         return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
 
-    def cover_vertex(self, vertex: ProjVertex) -> bool:
+    def cover_vertex_at_xy(self, vertex: ProjVertex, x: float, y: float) -> bool:
         x, y, z = vertex.xyz
         if not self.contains_point(x, y):
             return False  # don't cover
 
-        if z <= self.z:
+        if z <= self.calc_z_at_xy(x, y):
             return False  # vertex is nearer
 
         if vertex.index in [p.index for p in self.points]:

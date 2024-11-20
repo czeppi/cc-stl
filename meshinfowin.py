@@ -103,9 +103,19 @@ class MeshInfoHtmlCreator:
     def _iter_mesh_statistics_rows(self) -> Iterator[Tuple[str, Any]]:
         mesh = self._mesh
 
+        x_min = self._mesh.vertices[:, 0].min()
+        x_max = self._mesh.vertices[:, 0].max()
+        y_min = self._mesh.vertices[:, 1].min()
+        y_max = self._mesh.vertices[:, 1].max()
+        z_min = self._mesh.vertices[:, 2].min()
+        z_max = self._mesh.vertices[:, 2].max()
+
         yield 'num vertices', len(mesh.vertices)
         yield 'num edges', len(mesh.edges_unique)
         yield 'num triangles', len(mesh.faces)
+        yield 'x-interval', f'[{x_min:.3f}, {x_max:.3f}]'
+        yield 'y-interval', f'[{y_min:.3f}, {y_max:.3f}]'
+        yield 'z-interval', f'[{z_min:.3f}, {z_max:.3f}]'
 
     def _camera_infos(self) -> Iterator[str]:
         camera = self._camera

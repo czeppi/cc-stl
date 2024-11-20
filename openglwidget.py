@@ -38,7 +38,6 @@ class OpenGlWin(QOpenGLWidget):
         super().__init__()
         self._mesh = mesh
         self._handlers: Optional[OpenGlWinHandlers] = None
-        self._edges_array = np.array(self._mesh.edges_unique, dtype=np.uint32)  # self._mesh.edges_unique
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._edges_shader_program = EdgesShaderProgram(self._mesh)
