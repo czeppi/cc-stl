@@ -192,7 +192,7 @@ class FacesShaderProgram(ShaderProgram):
 
         vao.bind()
 
-        glDrawElements(GL_TRIANGLES, self._mesh.faces.size, GL_UNSIGNED_INT, None)
+        glDrawElements(GL_TRIANGLES, ebo_array.size, GL_UNSIGNED_INT, None)
 
         vao.release()
         prg.release()
@@ -269,7 +269,7 @@ class EdgesShaderProgram(ShaderProgram):
 
         vao.bind()
 
-        glDrawElements(GL_LINES, self._edges_array.size, GL_UNSIGNED_INT, None)
+        glDrawElements(GL_LINES, ebo_array.size, GL_UNSIGNED_INT, None)
 
         vao.release()
         prg.release()

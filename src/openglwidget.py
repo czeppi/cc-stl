@@ -202,7 +202,7 @@ class OpenGlWin(QOpenGLWidget):
                 self._handlers.change_camera_pos(self._camera)
         else:
             self._mouse_data.last_position = mouse_pos
-            print(f'mouse: ({mouse_pos.x()}, {mouse_pos.y()}')
+            # print(f'mouse: ({mouse_pos.x()}, {mouse_pos.y()}')
 
             item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=self._mvp_matrix,
                                                    view_size=self._view_size)

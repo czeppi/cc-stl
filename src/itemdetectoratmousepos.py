@@ -107,8 +107,6 @@ class ItemDetectorAtMousePos:
         if len(poss_triangles):
             sorted_triangles = sorted(poss_triangles,
                                       key=lambda triangle: triangle.calc_z_at_xy(x=mouse_pos.x(), y=mouse_pos.y()))
-            # z_map = {triangle.index: triangle.calc_z_at_xy(x=mouse_pos.x(), y=mouse_pos.y())
-            #          for triangle in poss_triangles}
             return sorted_triangles[0]
 
     def _iter_poss_triangles(self, mouse_pos: QPoint) -> Iterator[ProjTriangle]:
@@ -174,14 +172,6 @@ class ItemDetectorAtMousePos:
     def _iter_poss_edges(self, mouse_pos: QPoint, nearest_triangle: Optional[ProjTriangle]) -> Iterator[ProjEdge]:
         mouse_x, mouse_y = mouse_pos.x(), mouse_pos.y()
 
-        if nearest_triangle is None:
-            # print('  _iter_poss_edges: (no triangle)')
-            pass
-        else:
-            triangle_z = nearest_triangle.calc_z_at_xy(x=mouse_x, y=mouse_y)
-            points_str = ', '.join(f'v[{p.index}].z={p.z}' for p in nearest_triangle.points)
-            # print(f'  _iter_poss_edges: (triangle[{nearest_triangle.index}].z={triangle_z}, [{points_str}])')
-
         for edge_index in self._find_box_indices(mouse_pos, boxes=self._edge_boxes, distance=MOUSE_EDGE_DIST):
             vertex1_index, vertex2_index = self._mesh.edges_unique[edge_index]
 
@@ -192,9 +182,6 @@ class ItemDetectorAtMousePos:
             mouse_dist = proj_edge.calc_dist_to_point(mouse_x, mouse_y)
             if mouse_dist <= MOUSE_EDGE_DIST:
                 if nearest_triangle is None or not nearest_triangle.cover_edge_at_xy(proj_edge, x=mouse_x, y=mouse_y):
-                    # edge_z = proj_edge.calc_z_at_xy(x=mouse_x, y=mouse_y)
-                    # points_str = ', '.join(f'v[{p.index}].z={p.z}' for p in proj_edge.points)
-                    # print(f'    poss edge: {edge_index}, edge_z={edge_z}, points=[{points_str}]')
                     yield proj_edge
 
     def _create_proj_vertex_from_numpy_vertex(self, index: int) -> ProjVertex:
