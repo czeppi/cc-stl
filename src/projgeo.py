@@ -2,6 +2,8 @@ import math
 from dataclasses import dataclass
 from typing import Tuple, Iterator
 
+import numpy as np
+
 EPS = 1E-6
 
 
@@ -104,11 +106,12 @@ class ProjTriangle:
         return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
 
     def cover_vertex_at_xy(self, vertex: ProjVertex, x: float, y: float) -> bool:
-        x, y, z = vertex.xyz
+        vx, vy, vz = vertex.xyz
         if not self.contains_point(x, y):
             return False  # don't cover
 
-        if z <= self.calc_z_at_xy(x, y):
+        tri_z = self.calc_z_at_xy(x, y)
+        if vz <= tri_z:
             return False  # vertex is nearer
 
         if vertex.index in [p.index for p in self.points]:
@@ -140,19 +143,23 @@ class ProjTriangle:
         dy31 = y3 - y1
         dz31 = z3 - z1
 
-        if abs(dx21) > abs(dx31):
-            assert abs(dx21) >= EPS
-            mx =  dz21 / dx21
-        else:
-            assert abs(dx31) >= EPS
-            mx = dz31 / dx31
+        dx = x - x1
+        dy = y - y1
 
-        if abs(dy21) > abs(dy31):
-            assert abs(dy21) >= EPS
-            my = dz21 / dy21
-        else:
-            assert abs(dy31) >= EPS
-            my = dz31 / dy31
+        # coordinate transformation from in x, y with d21 and d31 as new basis vectors
+        s21, s31 = np.linalg.solve(np.array([[dx21, dx31],
+                                             [dy21, dy31]]), np.array([dx, dy]))
+        # solve [dx21 dx31] [s21]    [dx]
+        #       [dy21 dy31] [s31] == [dy]
+        # => s21 * d21 + s31 * d31 == [dx, dy]
+        eps = 1E-6
 
-        z = z1 + mx * (x - x1) + my * (y - y1)
+        dx_new = s21 * dx21 + s31 * dx31
+        dy_new = s21 * dy21 + s31 * dy31
+        assert abs(dx_new - dx) < eps
+        assert abs(dy_new - dy) < eps
+        assert -eps < s21 and -eps < s31
+        assert s21 + s31 < 1.0 + eps
+
+        z = z1 + s21 * dz21 + s31 * dz31
         return z

@@ -10,9 +10,10 @@ from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog
 from meshinfowin import MeshInfoWin
 from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
 
-STL_PATH = "stl-files/KLP_Lame_Tilted.stl"
-#STL_PATH = "stl-files/charybdisnano_v2_v187.stl"
-#STL_PATH = "stl-files/adapter_v2_bottom_pmw_3389.stl"
+STL_DPATH = "../stl-files/"
+STL_PATH = STL_DPATH + "KLP_Lame_Tilted.stl"
+#STL_PATH = STL_DPATH + "charybdisnano_v2_v187.stl"
+#STL_PATH = STL_DPATH + "adapter_v2_bottom_pmw_3389.stl"
 
 
 class MainWindow(QMainWindow):

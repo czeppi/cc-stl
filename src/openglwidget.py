@@ -49,7 +49,8 @@ class OpenGlWin(QOpenGLWidget):
         self._mvp_matrix = QMatrix4x4()
         self._view_size: Optional[Tuple[int, int]] = None
 
-        self._camera = Camera(distance=30.0, azimuth=0.0, elevation=45.0)
+        # self._camera = Camera(distance=30.0, azimuth=0.0, elevation=45.0)
+        self._camera = Camera(distance=25.0, azimuth=90.0, elevation=-15.0)
         self._mouse_data = MouseData()
         self._cur_mesh_item: Optional[MeshItemKey] = None
 
@@ -201,6 +202,7 @@ class OpenGlWin(QOpenGLWidget):
                 self._handlers.change_camera_pos(self._camera)
         else:
             self._mouse_data.last_position = mouse_pos
+            print(f'mouse: ({mouse_pos.x()}, {mouse_pos.y()}')
 
             item_detector = ItemDetectorAtMousePos(mesh=self._mesh, mvp_matrix=self._mvp_matrix,
                                                    view_size=self._view_size)
