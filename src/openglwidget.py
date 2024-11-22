@@ -16,7 +16,7 @@ from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType, MeshIte
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 GL_BACKGROUND_COLOR = 3 * [0.75]
-GL_VIEW_SIZE = 1200, 900
+GL_VIEW_SIZE = 1000, 700
 
 
 @dataclass
