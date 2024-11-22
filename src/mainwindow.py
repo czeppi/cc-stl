@@ -6,7 +6,7 @@ from typing import Callable
 
 import trimesh
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog
+from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog, QMessageBox
 
 from meshinfowin import MeshInfoWin
 from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
@@ -38,6 +38,9 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu('File')
         file_menu.addAction(self._create_action('open...', self.on_file_open))
 
+        help_menu  = menu_bar.addMenu('Help')
+        help_menu.addAction(self._create_action('About', self.on_help_about))
+
     def _create_action(self, name: str, handler: Callable[[], None]) -> QAction:
         action = QAction(name, self)
         action.triggered.connect(handler)
@@ -61,6 +64,17 @@ class MainWindow(QMainWindow):
 
         self._splitter = Splitter3D(self._mesh)
         self.setCentralWidget(self._splitter)
+
+    def on_help_about(self) -> None:
+        # QMessageBox.aboutQt(self, 'title')
+        lines = [
+            'CC-STL',
+            '',
+            'Copyright(C) 2024 Christian Czepluch',
+            '',
+            'Author: Christian Czepluch',
+        ]
+        QMessageBox.information(self, 'About cc-stl', '\n'.join(lines))
 
 
 class Splitter3D(QSplitter):
