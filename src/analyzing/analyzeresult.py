@@ -10,39 +10,33 @@ from geo3d import Plane, EndlessCylinder, Line3D
 
 @dataclass
 class AnalyzeResult:
-    surface_parts: List[SurfacePart]
-    edge_parts: List[EdgePart]
+    surface_parts: List[SurfacePatch]
+    edge_parts: List[EdgeSegment]
 
 
 class SurfaceType(Enum):
-    PLANE=1
-    SPHERE=2
-    CYLINDER=3
+    PLANE = 1
+    SPHERE = 2
+    CYLINDER = 3
 
 
 @dataclass
-class SurfacePart:  # or PartialSurface
+class SurfacePatch:  # or PartialSurface
     type: SurfaceType
-    triangle_indices: Set[int]   # face indices in mesh
+    triangle_indices: Set[int]  # face indices in mesh
     form: Plane | Sphere | EndlessCylinder
 
 
 class EdgeType(Enum):
-    LINE=1
-    CIRCLE=2
-    BEZIER2=3  # bezier curve 2nd degree
-    BEZIER3=4  # bezier curve 3nd degree
+    LINE = 1
+    CIRCLE = 2
+    BEZIER2 = 3  # bezier curve 2nd degree
+    BEZIER3 = 4  # bezier curve 3nd degree
 
 
 @dataclass
-class EdgePart:
+class EdgeSegment:
     type: EdgeType
     edge_indices: List[int]
     plane: Plane
-    form: Line3D # | Circle3D | Bezier2ndDegree3D  # perhaps better to use planar variants?
-
-
-
-
-
-
+    form: Line3D  # | Circle3D | Bezier2ndDegree3D  # perhaps better to use planar variants?

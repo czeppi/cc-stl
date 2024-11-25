@@ -4,13 +4,14 @@ from typing import Optional, List, Iterator, Tuple, Any
 
 import trimesh
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidget
 
+from analyzing.planefinder import PlaneFinder
 from camera import Camera
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
 
 
-class MeshInfoWin(QLabel):
+class MeshInfoWin(QWidget):
     """
     No cur item:
       - Button "show recocnized faces"
@@ -51,6 +52,37 @@ class MeshInfoWin(QLabel):
         self._cur_item: Optional[MeshItemKey] = None
         self._sel_items: List[MeshItemKey] = []
 
+        self._toolbar = self._create_toolbar()
+        self._label = QLabel()
+
+        layout = self._create_layout()
+        self.setLayout(layout)
+
+    def _create_toolbar(self) -> QToolBar:
+        toolbar = QToolBar(parent=self)  # important for vlayout.setMenuBar(toolbar)
+        for widget in self._iter_toolbar_widgets():
+            toolbar.addWidget(widget)
+        return toolbar
+
+    def _iter_toolbar_widgets(self) -> Iterator[QWidget]:
+        yield self._create_analyze_button()
+
+    def _create_analyze_button(self) -> QPushButton:
+        button = QPushButton()
+        button.setText('analyze')
+        #button.setStyleSheet('color: red; background-color: lightgray')
+        #button.setToolTip('switch solve parameter to "expected", to edit data')
+        button.clicked.connect(self.on_analyze)
+        return button
+
+    def _create_layout(self):
+        margin = 5
+        vlayout = QVBoxLayout()
+        vlayout.setContentsMargins(margin, 0, margin, margin)
+        vlayout.setMenuBar(self._toolbar)
+        vlayout.addWidget(self._label)
+        return vlayout
+
     def on_opengl_change_camera_pos(self, camera: Camera) -> None:
         self._camera = camera
         self._update_label()
@@ -67,8 +99,12 @@ class MeshInfoWin(QLabel):
         html_creator = MeshInfoHtmlCreator(mesh=self._mesh, camera=self._camera,
                                            cur_item=self._cur_item, sel_items=self._sel_items)
         html_text = html_creator.create_html()
-        self.setText(html_text)
-        self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self._label.setText(html_text)
+        self._label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+
+    def on_analyze(self) -> None:
+        plane_finder = PlaneFinder(self._mesh)
+        planes = plane_finder.find_planes()
 
 
 class MeshInfoHtmlCreator:
