@@ -1,4 +1,4 @@
-from typing import List, Optional, Iterator, Tuple
+from typing import List, Optional, Iterator, Tuple, Set
 
 import numpy as np
 import trimesh
@@ -10,6 +10,7 @@ from shaders import ColorTuple
 DEFAULT_FACET_COLOR = 0.4, 0.4, 0.8
 DEFAULT_EDGE_COLOR = 0.0, 0.0, 0.0
 CUR_ITEM_COLOR = 0.0, 1.0, 0.0
+MARK_ITEM_COLOR = 0.5, 1.0, 0.0
 
 
 class MeshColorizer:
@@ -32,11 +33,24 @@ class MeshColorizer:
         face_index_array = np.arange(num_faces)
 
         if cur_item and cur_item.type == MeshItemType.FACE:
-            all_not_cur_faces = np.delete(face_index_array, np.where(face_index_array == cur_item.index))
-            yield DEFAULT_FACET_COLOR, all_not_cur_faces
+            marked_face_indices = self._get_marked_face_indices(cur_item.index)
+            not_default_indices = marked_face_indices | {cur_item.index}
+            not_default_index_array = np.array(list(not_default_indices))
+            default_index_array = face_index_array[~np.isin(face_index_array, not_default_index_array)]
+            yield DEFAULT_FACET_COLOR, default_index_array
+            if len(marked_face_indices) > 0:
+                yield MARK_ITEM_COLOR, np.array(list(marked_face_indices))
             yield CUR_ITEM_COLOR, np.array([cur_item.index])
         else:
             yield DEFAULT_FACET_COLOR, face_index_array
+
+    def _get_marked_face_indices(self, face_index: int) -> Set[int]:
+        if self._analyze_result:
+            surface_patch = self._analyze_result.find_surface_patch(face_index)
+            if surface_patch:
+                return surface_patch.triangle_indices - {face_index}
+
+        return set()
 
     def iter_edge_colors(self) -> Iterator[Tuple[ColorTuple, np.array]]:
         cur_item = self._cur_item

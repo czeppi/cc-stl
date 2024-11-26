@@ -127,6 +127,9 @@ class MeshInfoWin(QWidget):
         self._analyze_result = AnalyzeResult(result_data)
         self._toolbar.removeAction(self._analyze_action)
         self._update_label()
+        if self._handlers.change_colorizer:
+            colorizer = MeshColorizer(mesh=self._mesh, analyze_result=self._analyze_result)
+            self._handlers.change_colorizer(colorizer)
 
 
 class MeshInfoHtmlCreator:
@@ -199,12 +202,12 @@ class MeshInfoHtmlCreator:
 
         if self._analyze_result:
             surface_patch = self._analyze_result.find_surface_patch(face_index)
-            if isinstance(surface_patch.form, Plane):
+            if surface_patch and isinstance(surface_patch.form, Plane):
                 plane = surface_patch.form
                 nx, ny, nz = plane.normal
                 yield f'plane.normal', f'({nx:.3f}, {ny:.3f}, {nz:.3f})'
                 yield f'plane.distance', f'{plane.distance:.3f}'
-            yield 'num triangles', f'{len(surface_patch.triangle_indices)}'
+                yield 'num triangles', f'{len(surface_patch.triangle_indices)}'
 
     def _camera_infos(self) -> Iterator[str]:
         camera = self._camera
