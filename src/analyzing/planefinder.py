@@ -3,7 +3,7 @@ from typing import Iterator
 import numpy as np
 import trimesh
 
-from analyzing.analyzeresult import SurfacePatch, SurfaceType
+from analyzing.analyzeresult import SurfacePatch, SurfaceKind
 from geo3d import Plane, Vector3D
 
 
@@ -34,7 +34,7 @@ class PlaneFinder:
             x, y, z, plane_dist = [float(v) for v in unique_value]
             plane = Plane(normal=Vector3D(x, y, z), distance=plane_dist)
             triangle_indices = {int(tri_index) for tri_index in (np.where(reverse_indices == unique_index)[0])}
-            yield SurfacePatch(type=SurfaceType.PLANE,
+            yield SurfacePatch(type=SurfaceKind.PLANE,
                                triangle_indices=triangle_indices,
                                form=plane)
 
@@ -43,7 +43,7 @@ class PlaneFinder:
         #     if len(group) >= 2:
         #         groups.append(group)
         #
-        #         yield SurfacePatch(type=SurfaceType.PLANE,
+        #         yield SurfacePatch(type=SurfaceKind.PLANE,
         #                            triangle_indices=set(group),
         #                            form=Plane())
 

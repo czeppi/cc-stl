@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional, List, Iterator, Tuple, Any
+from typing import Optional, List, Iterator, Tuple, Any, Dict
 
 import trimesh
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidget
 
-from analyzing.analyzeresult import AnalyzeResult
+from analyzing.analyzeresult import AnalyzeResult, SurfacePatch, SurfaceKind
 from analyzing.geoanalyzer import GeoAnalyzer
 from camera import Camera
+from geo3d import Plane
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
 
 
@@ -53,9 +54,11 @@ class MeshInfoWin(QWidget):
         self._cur_item: Optional[MeshItemKey] = None
         self._sel_items: List[MeshItemKey] = []
         self._analyze_result: Optional[AnalyzeResult] = None
+        self._triangle_surface_patch_map: Dict[int, SurfacePatch] = {}
 
         self._toolbar = self._create_toolbar()
         self._label = QLabel()
+        self._update_label()
 
         layout = self._create_layout()
         self.setLayout(layout)
@@ -99,7 +102,9 @@ class MeshInfoWin(QWidget):
 
     def _update_label(self) -> None:
         html_creator = MeshInfoHtmlCreator(mesh=self._mesh, camera=self._camera,
-                                           cur_item=self._cur_item, sel_items=self._sel_items)
+                                           cur_item=self._cur_item, sel_items=self._sel_items,
+                                           analyze_result=self._analyze_result,
+                                           triangle_surface_patch_map=self._triangle_surface_patch_map)
         html_text = html_creator.create_html()
         self._label.setText(html_text)
         self._label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -107,24 +112,140 @@ class MeshInfoWin(QWidget):
     def on_analyze(self) -> None:
         geo_analyzer = GeoAnalyzer(self._mesh)
         self._analyze_result = geo_analyzer.analyze()
+        self._triangle_surface_patch_map = self._create_triangle_surface_patch_map(
+            self._analyze_result)
+        self._update_label()
 
+    @staticmethod
+    def _create_triangle_surface_patch_map(analyze_result: AnalyzeResult) -> Dict[int, SurfacePatch]:
+        return {tri_index: patch
+                for patch in analyze_result.surface_patches
+                for tri_index in patch.triangle_indices}
 
 class MeshInfoHtmlCreator:
 
     def __init__(self, mesh: trimesh.Trimesh, camera: Camera,
-                 cur_item: Optional[MeshItemKey], sel_items: List[MeshItemKey]):
+                 cur_item: Optional[MeshItemKey], sel_items: List[MeshItemKey],
+                 analyze_result: Optional[AnalyzeResult],
+                 triangle_surface_patch_map: Optional[Dict[int, SurfacePatch]]):
         self._mesh = mesh
         self._camera = camera
         self._cur_item = cur_item
         self._sel_items = sel_items
+        self._analyze_result = analyze_result
+        self._triangle_surface_patch_map = triangle_surface_patch_map
 
     def create_html(self) -> str:
         return '\n'.join(self._iter_lines())
 
     def _iter_lines(self) -> Iterator[str]:
-        yield from self._iter_mesh_statistics()
-        yield from self._camera_infos()
         yield from self._cur_item_infos()
+        yield from self._camera_infos()
+        yield from self._analyze_infos()
+        yield from self._iter_mesh_statistics()
+
+    def _cur_item_infos(self) -> Iterator[str]:
+        cur_item = self._cur_item
+        if cur_item is None:
+            return
+
+        yield '<h1>cur item</h1>'
+        yield '<table>'
+
+        for name, value in self._cur_item_rows(cur_item):
+            yield f'<tr>'
+            yield f'<td align="left">{name}: </td>'
+            yield f'<td>{value}</td>'
+            yield f'</tr>'
+
+        yield '</table>'
+
+    def _cur_item_rows(self, cur_item: MeshItemKey) -> Iterator[Tuple[str, str]]:
+        if cur_item.type == MeshItemType.VERTEX:
+            yield from self._vertex_rows(cur_item.index)
+        elif cur_item.type == MeshItemType.EDGE:
+            yield from self._edge_rows(cur_item.index)
+        elif cur_item.type == MeshItemType.FACE:
+            yield from self._face_rows(cur_item.index)
+
+    def _vertex_rows(self, vertex_index: int) -> Iterator[Tuple[str, str]]:
+        mesh_vertex = self._mesh.vertices[vertex_index]
+        x, y, z = mesh_vertex
+
+        yield 'vertex', str(vertex_index)
+        yield f'x, y, z', f'({x:.3f}, {y:.3f}, {z:.3f})'
+
+    def _edge_rows(self, edge_index: int) -> Iterator[Tuple[str, str]]:
+        mesh_edge = self._mesh.edges_unique[edge_index]
+        vertex1_index, vertex2_index = mesh_edge
+        mesh_vertex1 = self._mesh.vertices[vertex1_index]
+        mesh_vertex2 = self._mesh.vertices[vertex2_index]
+        x1, y1, z1 = mesh_vertex1
+        x2, y2, z2 = mesh_vertex2
+
+        yield f'edge', str(edge_index)
+        yield f'dx, dy, dz', f'({x2 - x1:.3f}, {y2 - y1:.3f}, {z2 - z1:.3f})'
+
+    def _face_rows(self, face_index: int) -> Iterator[Tuple[str, str]]:
+        face_normal = self._mesh.face_normals[face_index]
+        nx, ny, nz = face_normal
+        yield f'face', str(face_index)
+        yield f'normal', f'({nx:.3f}, {ny:.3f}, {nz:.3f})'
+
+        if self._triangle_surface_patch_map and face_index in self._triangle_surface_patch_map:
+            surface_patch = self._triangle_surface_patch_map[face_index]
+            if isinstance(surface_patch.form, Plane):
+                plane = surface_patch.form
+                nx, ny, nz = plane.normal
+                yield f'plane.normal', f'({nx:.3f}, {ny:.3f}, {nz:.3f})'
+                yield f'plane.distance', f'{plane.distance:.3f}'
+            yield 'num triangles', f'{len(surface_patch.triangle_indices)}'
+
+    def _camera_infos(self) -> Iterator[str]:
+        camera = self._camera
+        if camera is None:
+            return
+
+        yield '<h1>camera</h1>'
+        yield '<table>'
+
+        for name, value in self._iter_camera_rows():
+            yield f'<tr>'
+            yield f'<td align="left">{name}: </td>'
+            yield f'<td>{value}</td>'
+            yield f'</tr>'
+
+        yield '</table>'
+
+    def _iter_camera_rows(self) -> Iterator[Tuple[str, str]]:
+        camera = self._camera
+
+        yield 'distance', f'{camera.distance:.1f}'
+        yield 'azimuth', f'{camera.azimuth:.1f}'
+        yield 'elevation', f'{camera.elevation:.1f}'
+
+    def _analyze_infos(self) -> Iterator[str]:
+        result = self._analyze_result
+        if result is None:
+            return
+
+        yield '<h1>analyze result</h1>'
+        yield '<table>'
+
+        for name, value in self._iter_analyze_rows():
+            yield f'<tr>'
+            yield f'<td align="left">{name}: </td>'
+            yield f'<td>{value}</td>'
+            yield f'</tr>'
+
+        yield '</table>'
+
+    def _iter_analyze_rows(self) -> Iterator[Tuple[str, str]]:
+        result = self._analyze_result
+
+        yield 'num planes', result.count_planes()
+        yield 'num spheres', result.count_spheres()
+        yield 'num cylinders', result.count_cylinders()
 
     def _iter_mesh_statistics(self) -> Iterator[str]:
         yield '<h1>mesh</h1>'
@@ -155,41 +276,3 @@ class MeshInfoHtmlCreator:
         yield 'y-interval', f'[{y_min:.3f}, {y_max:.3f}]'
         yield 'z-interval', f'[{z_min:.3f}, {z_max:.3f}]'
 
-    def _camera_infos(self) -> Iterator[str]:
-        camera = self._camera
-        if camera is None:
-            return
-
-        yield '<h1>camera</h1>'
-        yield '<table>'
-
-        for name, value in self._iter_camera_rows():
-            yield f'<tr>'
-            yield f'<td align="left">{name}: </td>'
-            yield f'<td>{value}</td>'
-            yield f'</tr>'
-
-        yield '</table>'
-
-    def _iter_camera_rows(self) -> Iterator[Tuple[str, str]]:
-        camera = self._camera
-
-        yield 'distance', f'{camera.distance:.1f}'
-        yield 'azimuth', f'{camera.azimuth:.1f}'
-        yield 'elevation', f'{camera.elevation:.1f}'
-
-    def _cur_item_infos(self) -> Iterator[str]:
-        cur_item = self._cur_item
-        if cur_item is None:
-            return
-
-        yield '<h1>cur item</h1>'
-
-        if cur_item.type == MeshItemType.VERTEX:
-            mesh_vertex = self._mesh.vertices[cur_item.index]
-            x, y, z = mesh_vertex
-            yield f'vertex[{cur_item.index}]:\n({x:.3f}, {y:.3f}, {z:.3f})'
-        elif cur_item.type == MeshItemType.EDGE:
-            yield f'edge[{cur_item.index}]'
-        elif cur_item.type == MeshItemType.FACE:
-            yield f'face[{cur_item.index}]'

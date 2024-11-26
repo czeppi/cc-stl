@@ -13,8 +13,17 @@ class AnalyzeResult:
     surface_patches: List[SurfacePatch]
     edge_segments: List[EdgeSegment]
 
+    def count_planes(self) -> int:
+        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.PLANE)
 
-class SurfaceType(Enum):
+    def count_spheres(self) -> int:
+        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.SPHERE)
+
+    def count_cylinders(self) -> int:
+        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.CYLINDER)
+
+
+class SurfaceKind(Enum):
     PLANE = 1
     SPHERE = 2
     CYLINDER = 3
@@ -22,7 +31,7 @@ class SurfaceType(Enum):
 
 @dataclass
 class SurfacePatch:  # or PartialSurface
-    type: SurfaceType
+    type: SurfaceKind
     triangle_indices: Set[int]  # face indices in mesh
     form: Plane | Sphere | EndlessCylinder
 

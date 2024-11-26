@@ -89,7 +89,7 @@ class Splitter3D(QSplitter):
         self.addWidget(self._opengl_widget)
         self.addWidget(self._mesh_info_win)
 
-        self.setSizes([1, 200])
+        self.setSizes([1, 250])
 
         self.setStretchFactor(0, 1)
         self.setStretchFactor(1, 0)
