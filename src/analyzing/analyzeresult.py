@@ -5,13 +5,13 @@ from typing import List, Set
 
 from trimesh.primitives import Sphere
 
-from geo3d import Plane, EndlessCylinder, Line3D
+from geo3d import Plane, EndlessCylinder, Line3D, Vector3D
 
 
 @dataclass
 class AnalyzeResult:
-    surface_parts: List[SurfacePatch]
-    edge_parts: List[EdgeSegment]
+    surface_patches: List[SurfacePatch]
+    edge_segments: List[EdgeSegment]
 
 
 class SurfaceType(Enum):

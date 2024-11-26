@@ -6,7 +6,8 @@ import trimesh
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidget
 
-from analyzing.planefinder import PlaneFinder
+from analyzing.analyzeresult import AnalyzeResult
+from analyzing.geoanalyzer import GeoAnalyzer
 from camera import Camera
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
 
@@ -51,6 +52,7 @@ class MeshInfoWin(QWidget):
         self._camera: Optional[Camera] = None
         self._cur_item: Optional[MeshItemKey] = None
         self._sel_items: List[MeshItemKey] = []
+        self._analyze_result: Optional[AnalyzeResult] = None
 
         self._toolbar = self._create_toolbar()
         self._label = QLabel()
@@ -103,8 +105,8 @@ class MeshInfoWin(QWidget):
         self._label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
     def on_analyze(self) -> None:
-        plane_finder = PlaneFinder(self._mesh)
-        planes = plane_finder.find_planes()
+        geo_analyzer = GeoAnalyzer(self._mesh)
+        self._analyze_result = geo_analyzer.analyze()
 
 
 class MeshInfoHtmlCreator:

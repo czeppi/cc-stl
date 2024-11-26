@@ -1,5 +1,10 @@
+from typing import Iterator
+
 import numpy as np
 import trimesh
+
+from analyzing.analyzeresult import SurfacePatch, SurfaceType
+from geo3d import Plane, Vector3D
 
 
 class PlaneFinder:
@@ -15,20 +20,32 @@ class PlaneFinder:
     def __init__(self, mesh: trimesh.Trimesh):
         self._mesh = mesh
 
-    def find_planes(self):
-        distances = self._create_place_distances_from_source()
-        np.hstack()
+    def find_planes(self) -> Iterator[SurfacePatch]:
+        normals = self._mesh.face_normals
+        distances = self._create_plane_distances_from_source()
+        planes_data = np.hstack((normals, distances.reshape(-1, 1)))
 
         eps = 1E-3
-        round_normals = np.round(self._mesh.face_normals / eps) * eps
-        _, unique_indices = np.unique(round_normals, axis=0, return_inverse=True)
+        round_data = np.round(planes_data / eps) * eps
+        unique_values, reverse_indices, unique_counts = np.unique(round_data, axis=0,
+                                                                  return_inverse=True, return_counts=True)
+        for unique_index in np.where(unique_counts >= 2)[0]:
+            unique_value = unique_values[unique_index]
+            x, y, z, plane_dist = [float(v) for v in unique_value]
+            plane = Plane(normal=Vector3D(x, y, z), distance=plane_dist)
+            triangle_indices = {int(tri_index) for tri_index in (np.where(reverse_indices == unique_index)[0])}
+            yield SurfacePatch(type=SurfaceType.PLANE,
+                               triangle_indices=triangle_indices,
+                               form=plane)
 
-        groups = []
-        for i in np.unique(unique_indices):
-            group = np.where(unique_indices == i)[0]
-            if len(group) >= 2:
-                groups.append(group)
-        pass
+        # for i in np.unique(reverse_indices):
+        #     group = np.where(reverse_indices == i)[0]
+        #     if len(group) >= 2:
+        #         groups.append(group)
+        #
+        #         yield SurfacePatch(type=SurfaceType.PLANE,
+        #                            triangle_indices=set(group),
+        #                            form=Plane())
 
     # def _create_place_distances_from_source(self) -> np.array:
     #     triangles = self._mesh.vertices[self._mesh.faces]
@@ -42,12 +59,9 @@ class PlaneFinder:
     #     distances = np.abs(d) / norm_lengths.flatten()
     #     return distances
 
-    def _create_place_distances_from_source(self) -> np.array:
+    def _create_plane_distances_from_source(self) -> np.array:
         normals = self._mesh.face_normals
         triangle_points = self._mesh.triangles[:, 0, :]  # take one point of every triangle
         ein_sum = np.einsum('ij,ij->i', normals, triangle_points)
         distances = np.abs(ein_sum) / np.linalg.norm(normals, axis=1)
-
         return distances
-
-
