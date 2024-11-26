@@ -1,26 +1,47 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Set
+from typing import List, Set, Dict, Optional
 
 from trimesh.primitives import Sphere
 
-from geo3d import Plane, EndlessCylinder, Line3D, Vector3D
+from geo3d import Plane, EndlessCylinder, Line3D
 
 
 @dataclass
-class AnalyzeResult:
+class AnalyzeResultData:
     surface_patches: List[SurfacePatch]
     edge_segments: List[EdgeSegment]
 
+
+class AnalyzeResult:
+
+    def __init__(self, result_data: AnalyzeResultData):
+        self._result_data = result_data
+        self._triangle_surface_patch_map = self._create_triangle_surface_patch_map(result_data)
+
+    @staticmethod
+    def _create_triangle_surface_patch_map(analyze_result: AnalyzeResultData) -> Dict[int, SurfacePatch]:
+        return {tri_index: patch
+                for patch in analyze_result.surface_patches
+                for tri_index in patch.triangle_indices}
+
+    @property
+    def data(self) -> AnalyzeResultData:
+        return self._result_data
+
+    def find_surface_patch(self, face_index: int) -> Optional[SurfacePatch]:
+        return self._triangle_surface_patch_map.get(face_index, None)
+
     def count_planes(self) -> int:
-        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.PLANE)
+        return sum(1 for patch in self._result_data.surface_patches if patch.type == SurfaceKind.PLANE)
 
     def count_spheres(self) -> int:
-        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.SPHERE)
+        return sum(1 for patch in self._result_data.surface_patches if patch.type == SurfaceKind.SPHERE)
 
     def count_cylinders(self) -> int:
-        return sum(1 for patch in self.surface_patches if patch.type == SurfaceKind.CYLINDER)
+        return sum(1 for patch in self._result_data.surface_patches if patch.type == SurfaceKind.CYLINDER)
 
 
 class SurfaceKind(Enum):

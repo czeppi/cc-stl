@@ -13,6 +13,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
 from camera import Camera
 from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType, MeshItemKey
+from meshcolorizer import MeshColorizer
 from shaders import FacesShaderProgram, EdgesShaderProgram, VerticesShaderProgram
 
 GL_BACKGROUND_COLOR = 3 * [0.75]
@@ -38,6 +39,7 @@ class OpenGlWin(QOpenGLWidget):
         super().__init__()
         self._mesh = mesh
         self._handlers: Optional[OpenGlWinHandlers] = None
+        self._colorizer = MeshColorizer(mesh)
 
         self._faces_shader_program = FacesShaderProgram(self._mesh)
         self._edges_shader_program = EdgesShaderProgram(self._mesh)
@@ -124,41 +126,27 @@ class OpenGlWin(QOpenGLWidget):
         cur_item = self._cur_mesh_item
 
         # paint
-        num_faces = len(self._mesh.faces)
-        face_index_array = np.arange(num_faces)
-        if cur_item and cur_item.type == MeshItemType.FACE:
-            face_index_array = np.delete(face_index_array, np.where(face_index_array == cur_item.index))
-            self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
-                                             face_index_array=face_index_array)
+        self._colorizer.set_cur_item(cur_item)
+        self._colorizer.set_sel_items([])  # not used until now
 
-            face_index_array = np.array([cur_item.index])
+        for face_color, face_index_array in self._colorizer.iter_face_colors():
             self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
                                              face_index_array=face_index_array,
-                                             color=(0.0, 1.0, 0.0))
-        else:
-            self._faces_shader_program.paint(camera=self._camera, mvp_matrix=mvp_matrix,
-                                             face_index_array=face_index_array)
+                                             color=face_color)
 
-        num_edges = len(self._mesh.edges_unique)
-        edge_index_array = np.arange(num_edges)
-        if cur_item and cur_item.type == MeshItemType.EDGE:
-            edge_index_array = np.delete(edge_index_array, np.where(edge_index_array == cur_item.index))
-            self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
-                                             edge_index_array=edge_index_array)
-
-            edge_index_array = np.array([cur_item.index])
+        for edge_color, edge_index_array in self._colorizer.iter_edge_colors():
             self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
                                              edge_index_array=edge_index_array,
-                                             color=(0.0, 1.0, 0.0))
-        else:
-            self._edges_shader_program.paint(mvp_matrix=mvp_matrix,
-                                             edge_index_array=edge_index_array)
+                                             color=edge_color)
 
-        self._edges_shader_program.paint(mvp_matrix=mvp_matrix)
+        for vertex_color, vertex_index_array in self._colorizer.iter_vertex_colors():
+            self._vertices_shader_program.paint(mvp_matrix=mvp_matrix,
+                                                vertex_indices_array=vertex_index_array,
+                                                color=vertex_color)
 
-        if cur_item and cur_item.type == MeshItemType.VERTEX:
-            self._vertices_shader_program.set_selected_vertices([cur_item.index])
-            self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
+        # if cur_item and cur_item.type == MeshItemType.VERTEX:
+        #     self._vertices_shader_program.set_selected_vertices([cur_item.index])
+        #     self._vertices_shader_program.paint(mvp_matrix=mvp_matrix)
 
     @staticmethod
     def _create_eye_matrix() -> QMatrix4x4:
@@ -232,3 +220,6 @@ class OpenGlWin(QOpenGLWidget):
 
         if self._handlers:
             self._handlers.change_camera_pos(self._camera)
+
+    def on_change_colorizer(self, colorizer: MeshColorizer) -> None:
+        self._colorizer = colorizer

@@ -8,7 +8,7 @@ import trimesh
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog, QMessageBox
 
-from meshinfowin import MeshInfoWin
+from meshinfowin import MeshInfoWin, MeshInfoWinHandlers
 from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
 
 ROOT_DPATH = Path(sys.argv[0]).absolute().parent.parent
@@ -95,10 +95,14 @@ class Splitter3D(QSplitter):
         self.setStretchFactor(1, 0)
 
     def _set_handlers(self) -> None:
-        handlers = OpenGlWinHandlers(change_camera_pos=self._mesh_info_win.on_opengl_change_camera_pos,
-                                     change_cur_item=self._mesh_info_win.on_opengl_change_cur_item,
-                                     change_sel_items=self._mesh_info_win.on_opengl_change_sel_items)
-        self._opengl_widget.set_handlers(handlers)
+        opengl_handlers = OpenGlWinHandlers(change_camera_pos=self._mesh_info_win.on_opengl_change_camera_pos,
+                                            change_cur_item=self._mesh_info_win.on_opengl_change_cur_item,
+                                            change_sel_items=self._mesh_info_win.on_opengl_change_sel_items)
+        self._opengl_widget.set_handlers(opengl_handlers)
+
+        mesh_info_handlers = MeshInfoWinHandlers(
+            change_colorizer=self._opengl_widget.on_change_colorizer)
+        self._mesh_info_win.set_handlers(mesh_info_handlers)
 
 
 if __name__ == "__main__":

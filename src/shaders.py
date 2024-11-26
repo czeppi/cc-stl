@@ -12,11 +12,9 @@ from PySide6.QtOpenGL import QOpenGLShaderProgram, QOpenGLShader, QOpenGLVertexA
 
 from camera import Camera
 
-
 DEFAULT_FACET_COLOR = 0.4, 0.4, 0.8
 DEFAULT_EDGE_COLOR = 0.0, 0.0, 0.0
 ColorTuple = Tuple[float, float, float]  # all values in [0, 1]
-
 
 FACES_VERTEX_SHADER_SRC = """
     #version 330 core
@@ -89,9 +87,11 @@ VERTICES_VERTEX_SHADER_SRC = """
 
 VERTICES_FRAGMENT_SHADER_SRC = """
     #version 330
+    uniform vec3 vertexColor; 
+    
     out vec4 fragColor;
     void main() {
-        fragColor = vec4(0.0, 1.0, 0.0, 1.0);  // selected color for vertices
+        fragColor = vec4(vertexColor, 1.0);  // selected color for vertices
     }
 """
 
@@ -168,8 +168,8 @@ class FacesShaderProgram(ShaderProgram):
         return ebo
 
     def paint(self, camera: Camera, mvp_matrix: np.array,
-              color: Optional[ColorTuple]=None,
-              face_index_array: Optional[np.array]=None) -> None:
+              color: Optional[ColorTuple] = None,
+              face_index_array: Optional[np.array] = None) -> None:
         prg = self._gl_program
         vao = self._vao
 
@@ -241,11 +241,8 @@ class EdgesShaderProgram(ShaderProgram):
         return ebo
 
     def paint(self, mvp_matrix: np.array,
-              color: Optional[ColorTuple]=None,
-              edge_index_array: Optional[np.array]=None) -> None:
-        prg = self._gl_program
-        vao = self._vao
-
+              color: Optional[ColorTuple] = None,
+              edge_index_array: Optional[np.array] = None) -> None:
         ebo_array = self._edges_array
         if edge_index_array is not None and len(edge_index_array) > 0:
             ebo_array = ebo_array[edge_index_array]
@@ -260,15 +257,15 @@ class EdgesShaderProgram(ShaderProgram):
         #glPolygonOffset(-1.0, -1.0)  # no effect
         glLineWidth(2.0)
 
+        prg = self._gl_program
         prg.bind()
         prg.setUniformValue("mvp_matrix", mvp_matrix)
-
         if color is None:
             color = DEFAULT_EDGE_COLOR
         prg.setUniformValue("edgeColor", QVector3D(*color))
 
+        vao = self._vao
         vao.bind()
-
         glDrawElements(GL_LINES, ebo_array.size, GL_UNSIGNED_INT, None)
 
         vao.release()
@@ -283,7 +280,6 @@ class VerticesShaderProgram(ShaderProgram):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__(vertex_shader_src=VERTICES_VERTEX_SHADER_SRC, fragment_shader_src=VERTICES_FRAGMENT_SHADER_SRC)
         self._mesh = mesh
-        self._selected_indices = []
 
         self._vao = QOpenGLVertexArrayObject()
         self._ebo = QOpenGLBuffer(QOpenGLBuffer.IndexBuffer)
@@ -318,32 +314,27 @@ class VerticesShaderProgram(ShaderProgram):
         ebo.release()
         return ebo
 
-    def set_selected_vertices(self, selected_indices: List[int]) -> None:
-        if len(selected_indices) > 0:
-            ebo = self._ebo
-            ebo.bind()
-
-            vertex_indices = np.array(selected_indices)
-            ebo.allocate(vertex_indices.tobytes(), vertex_indices.nbytes)
-            ebo.release()
-
-        self._selected_indices = selected_indices
-
-    def paint(self, mvp_matrix: np.array) -> None:
-        if len(self._selected_indices) == 0:
+    def paint(self, mvp_matrix: np.array,
+              color: ColorTuple,
+              vertex_indices_array: np.array) -> None:
+        if len(vertex_indices_array) == 0:
             return
 
-        prg = self._gl_program
-        vao = self._vao
+        ebo = self._ebo
+        ebo.bind()
+        ebo.allocate(vertex_indices_array.tobytes(), vertex_indices_array.nbytes)
+        ebo.release()
 
         glPointSize(5.0)
 
+        prg = self._gl_program
         prg.bind()
         prg.setUniformValue("mvp_matrix", mvp_matrix)
-        vao.bind()
+        prg.setUniformValue("vertexColor", QVector3D(*color))
 
-        n = len(self._selected_indices)
-        glDrawElements(GL_POINTS, n, GL_UNSIGNED_INT, None)
+        vao = self._vao
+        vao.bind()
+        glDrawElements(GL_POINTS, len(vertex_indices_array), GL_UNSIGNED_INT, None)
 
         vao.release()
         prg.release()

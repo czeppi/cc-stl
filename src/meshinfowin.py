@@ -1,27 +1,34 @@
 from __future__ import annotations
 
-from typing import Optional, List, Iterator, Tuple, Any, Dict
+from dataclasses import dataclass
+from typing import Optional, List, Iterator, Tuple, Any, Callable
 
 import trimesh
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidget
 
-from analyzing.analyzeresult import AnalyzeResult, SurfacePatch, SurfaceKind
+from analyzing.analyzeresult import AnalyzeResultData, AnalyzeResult
 from analyzing.geoanalyzer import GeoAnalyzer
 from camera import Camera
 from geo3d import Plane
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
+from meshcolorizer import MeshColorizer
+
+
+@dataclass
+class MeshInfoWinHandlers:
+    change_colorizer: Callable[[MeshColorizer], None]
 
 
 class MeshInfoWin(QWidget):
     """
     No cur item:
-      - Button "show recocnized faces"
-      - Button "show recocnized polylines"
+      - Button "show recognized faces"
+      - Button "show recognized polylines"
 
     cur item is face:
       - show index, norm angles + dist. to source
-      if level/floor:
+      if plane:
         - buttons: "show connected", "show whole", "show all ortho"
       elif sphere:
         - show center + radius
@@ -50,11 +57,12 @@ class MeshInfoWin(QWidget):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
         self._mesh = mesh
+        self._handlers: Optional[MeshInfoWinHandlers] = None
+
         self._camera: Optional[Camera] = None
         self._cur_item: Optional[MeshItemKey] = None
         self._sel_items: List[MeshItemKey] = []
-        self._analyze_result: Optional[AnalyzeResult] = None
-        self._triangle_surface_patch_map: Dict[int, SurfacePatch] = {}
+        self._analyze_result: Optional[AnalyzeResultData] = None
 
         self._toolbar = self._create_toolbar()
         self._label = QLabel()
@@ -65,8 +73,10 @@ class MeshInfoWin(QWidget):
 
     def _create_toolbar(self) -> QToolBar:
         toolbar = QToolBar(parent=self)  # important for vlayout.setMenuBar(toolbar)
-        for widget in self._iter_toolbar_widgets():
-            toolbar.addWidget(widget)
+        analyze_button = self._create_analyze_button()
+        self._analyze_action = toolbar.addWidget(analyze_button)
+        # for widget in self._iter_toolbar_widgets():
+        #     toolbar.addWidget(widget)
         return toolbar
 
     def _iter_toolbar_widgets(self) -> Iterator[QWidget]:
@@ -88,6 +98,9 @@ class MeshInfoWin(QWidget):
         vlayout.addWidget(self._label)
         return vlayout
 
+    def set_handlers(self, handlers: MeshInfoWinHandlers) -> None:
+        self._handlers = handlers
+
     def on_opengl_change_camera_pos(self, camera: Camera) -> None:
         self._camera = camera
         self._update_label()
@@ -103,37 +116,29 @@ class MeshInfoWin(QWidget):
     def _update_label(self) -> None:
         html_creator = MeshInfoHtmlCreator(mesh=self._mesh, camera=self._camera,
                                            cur_item=self._cur_item, sel_items=self._sel_items,
-                                           analyze_result=self._analyze_result,
-                                           triangle_surface_patch_map=self._triangle_surface_patch_map)
+                                           analyze_result=self._analyze_result)
         html_text = html_creator.create_html()
         self._label.setText(html_text)
         self._label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
     def on_analyze(self) -> None:
         geo_analyzer = GeoAnalyzer(self._mesh)
-        self._analyze_result = geo_analyzer.analyze()
-        self._triangle_surface_patch_map = self._create_triangle_surface_patch_map(
-            self._analyze_result)
+        result_data = geo_analyzer.analyze()
+        self._analyze_result = AnalyzeResult(result_data)
+        self._toolbar.removeAction(self._analyze_action)
         self._update_label()
 
-    @staticmethod
-    def _create_triangle_surface_patch_map(analyze_result: AnalyzeResult) -> Dict[int, SurfacePatch]:
-        return {tri_index: patch
-                for patch in analyze_result.surface_patches
-                for tri_index in patch.triangle_indices}
 
 class MeshInfoHtmlCreator:
 
     def __init__(self, mesh: trimesh.Trimesh, camera: Camera,
                  cur_item: Optional[MeshItemKey], sel_items: List[MeshItemKey],
-                 analyze_result: Optional[AnalyzeResult],
-                 triangle_surface_patch_map: Optional[Dict[int, SurfacePatch]]):
+                 analyze_result: Optional[AnalyzeResult]):
         self._mesh = mesh
         self._camera = camera
         self._cur_item = cur_item
         self._sel_items = sel_items
         self._analyze_result = analyze_result
-        self._triangle_surface_patch_map = triangle_surface_patch_map
 
     def create_html(self) -> str:
         return '\n'.join(self._iter_lines())
@@ -192,8 +197,8 @@ class MeshInfoHtmlCreator:
         yield f'face', str(face_index)
         yield f'normal', f'({nx:.3f}, {ny:.3f}, {nz:.3f})'
 
-        if self._triangle_surface_patch_map and face_index in self._triangle_surface_patch_map:
-            surface_patch = self._triangle_surface_patch_map[face_index]
+        if self._analyze_result:
+            surface_patch = self._analyze_result.find_surface_patch(face_index)
             if isinstance(surface_patch.form, Plane):
                 plane = surface_patch.form
                 nx, ny, nz = plane.normal
