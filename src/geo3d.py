@@ -1,6 +1,9 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -13,6 +16,15 @@ class Vector3D:
         yield self.x
         yield self.y
         yield self.z
+
+    def __add__(self, other: Vector3D) -> Vector3D:
+        return Vector3D(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other: Vector3D) -> Vector3D:
+        return Vector3D(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def dot(self, other: Vector3D) -> float:
+        return self.x * other.x + self.y * other.y + self.z * other.z
 
     @property
     def length(self) -> float:
@@ -35,7 +47,7 @@ class Line3D:
 
 
 @dataclass
-class Spherical:
+class Sphere:
     center: Vector3D
     radius: float
 
@@ -46,3 +58,24 @@ class EndlessCylinder:
     radius: float
 
 
+def calc_sphere_from_4_points(p1: Vector3D, p2: Vector3D, p3: Vector3D, p4: Vector3D) -> Optional[Sphere]:
+    A = np.array([
+        [p2.x - p1.x, p2.y - p1.y, p2.z - p1.z],
+        [p3.x - p1.x, p3.y - p1.y, p3.z - p1.z],
+        [p4.x - p1.x, p4.y - p1.y, p4.z - p1.z],
+    ])
+
+    B = 0.5 * np.array([
+        p2.dot(p2) - p1.dot(p1),
+        p3.dot(p3) - p1.dot(p1),
+        p4.dot(p4) - p1.dot(p1),
+    ])
+
+    try:
+        center_array = np.linalg.solve(A, B)
+    except np.linalg.LinAlgError:
+        return
+
+    center = Vector3D(*center_array)
+    radius = (p1 - center).length
+    return Sphere(center=center, radius=radius)

@@ -10,9 +10,8 @@ from PySide6.QtGui import QMatrix4x4
 
 from projgeo import ProjTriangle, ProjVertex, ProjEdge
 
-SELECTED_VERTEX_INDICES = [20000]
-MOUSE_VERTEX_DIST = 10.0  # max distance from mouse, to select vertex
-MOUSE_EDGE_DIST = 10.0  # max distance from mouse, to select edge
+MOUSE_VERTEX_DIST = 5.0  # max distance from mouse, to select vertex
+MOUSE_EDGE_DIST = 5.0  # max distance from mouse, to select edge
 
 
 class MeshItemType(Enum):

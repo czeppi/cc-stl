@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidge
 from analyzing.analyzeresult import AnalyzeResultData, AnalyzeResult
 from analyzing.geoanalyzer import GeoAnalyzer
 from camera import Camera
-from geo3d import Plane
+from geo3d import Plane, Sphere
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
 from meshcolorizer import MeshColorizer
 
@@ -207,6 +207,12 @@ class MeshInfoHtmlCreator:
                 nx, ny, nz = plane.normal
                 yield f'plane.normal', f'({nx:.3f}, {ny:.3f}, {nz:.3f})'
                 yield f'plane.distance', f'{plane.distance:.3f}'
+                yield 'num triangles', f'{len(surface_patch.triangle_indices)}'
+            elif surface_patch and isinstance(surface_patch.form, Sphere):
+                sphere = surface_patch.form
+                cx, cy, cz = sphere.center
+                yield f'sphere.center', f'({cx:.3f}, {cy:.3f}, {cz:.3f})'
+                yield f'sphere.radius', f'{sphere.radius:.3f}'
                 yield 'num triangles', f'{len(surface_patch.triangle_indices)}'
 
     def _camera_infos(self) -> Iterator[str]:

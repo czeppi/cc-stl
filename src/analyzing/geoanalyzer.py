@@ -2,6 +2,8 @@ import trimesh
 
 from analyzing.analyzeresult import AnalyzeResultData
 from analyzing.planefinder import PlaneFinder
+from analyzing.spherefinder import SphereFinder
+from analyzing.stlmesh import StlMeshCreator
 
 
 class GeoAnalyzer:
@@ -14,4 +16,11 @@ class GeoAnalyzer:
         plane_finder = PlaneFinder(self._mesh)
         planes = list(plane_finder.find_planes())
         print('analyze ready.')
-        return AnalyzeResultData(surface_patches=planes, edge_segments=[])
+
+        stl_mesh_creator = StlMeshCreator(self._mesh)
+        stl_mesh = stl_mesh_creator.create()
+
+        sphere_finder = SphereFinder(stl_mesh)
+        spheres = list(sphere_finder.find_spheres())
+
+        return AnalyzeResultData(surface_patches=planes + spheres, edge_segments=[])

@@ -16,14 +16,14 @@ class QuasiEqualRowFinder:
     def __init__(self, array: MatrixArray, eps_list: List[float]):
         assert len(array.shape) == 2
         n, m = array.shape
-        assert m == len(eps_list)
+        assert m == len(eps_list) + 1  # last column must be key, which will return
 
-        self._array_with_indices = np.column_stack((array, np.arange(n)))
+        self._array = array
         self._eps_list = eps_list
-        self._num_columns = m
+        self._num_columns = len(eps_list)
 
     def iter_groups(self) -> Iterator[IndexArray]:
-        yield from self._iter_groups(self._array_with_indices, j=0)
+        yield from self._iter_groups(self._array, j=0)
 
     def _iter_groups(self, array: MatrixArray, j: int) -> Iterator[IndexArray]:
         """
@@ -36,7 +36,7 @@ class QuasiEqualRowFinder:
         eps = self._eps_list[j]
         index_column = self._num_columns
 
-        sorted_array = array[np.argsort(array[:, j].argsort())]
+        sorted_array = array[array[:, j].argsort()]
         diff_array = np.diff(sorted_array[:, j])
         gap_indices = np.where(diff_array >= eps)[0]
         gap_indices = np.append(gap_indices, len(sorted_array))
@@ -45,9 +45,10 @@ class QuasiEqualRowFinder:
         for d in gap_indices:
             k2 = d + 1
             sub_array = sorted_array[k1:k2]
-            if len(sub_array) == 1 or j + 1 == self._num_columns:
-                yield sub_array[:, index_column]
-            else:
-                yield from self._iter_groups(sub_array, j=j+1)
+            if len(sub_array) >= 2:  # skip unique items
+                if j + 1 == self._num_columns:
+                    yield sub_array[:, index_column]
+                else:
+                    yield from self._iter_groups(sub_array, j=j+1)
 
             k1 = k2
