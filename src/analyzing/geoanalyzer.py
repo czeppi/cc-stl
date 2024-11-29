@@ -21,6 +21,8 @@ class GeoAnalyzer:
         stl_mesh = stl_mesh_creator.create()
 
         sphere_finder = SphereFinder(stl_mesh)
-        spheres = list(sphere_finder.find_spheres())
+        edge_sphere_map = dict(sphere_finder.iter_edge_spheres())
+        spheres = list(sphere_finder.iter_surface_patches(edge_sphere_map))
 
-        return AnalyzeResultData(surface_patches=planes + spheres, edge_segments=[])
+        return AnalyzeResultData(surface_patches=planes + spheres, edge_segments=[],
+                                 stl_mesh=stl_mesh, edge_sphere_map=edge_sphere_map)

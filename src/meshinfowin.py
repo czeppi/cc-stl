@@ -194,6 +194,13 @@ class MeshInfoHtmlCreator:
         yield f'edge', str(edge_index)
         yield f'dx, dy, dz', f'({x2 - x1:.3f}, {y2 - y1:.3f}, {z2 - z1:.3f})'
 
+        if self._analyze_result:
+            sphere = self._analyze_result.data.edge_sphere_map.get(edge_index, None)
+            if sphere:
+                cx, cy, cz = sphere.center
+                yield f'sphere.center', f'({cx:.3f}, {cy:.3f}, {cz:.3f})'
+                yield f'sphere.radius', f'{sphere.radius:.3f}'
+
     def _face_rows(self, face_index: int) -> Iterator[Tuple[str, str]]:
         face_normal = self._mesh.face_normals[face_index]
         nx, ny, nz = face_normal

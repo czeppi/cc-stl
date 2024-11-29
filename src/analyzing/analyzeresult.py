@@ -6,6 +6,7 @@ from typing import List, Set, Dict, Optional
 
 from trimesh.primitives import Sphere
 
+from analyzing.stlmesh import StlMesh
 from geo3d import Plane, EndlessCylinder, Line3D
 
 
@@ -13,6 +14,8 @@ from geo3d import Plane, EndlessCylinder, Line3D
 class AnalyzeResultData:
     surface_patches: List[SurfacePatch]
     edge_segments: List[EdgeSegment]
+    stl_mesh: StlMesh
+    edge_sphere_map: Dict[int, Sphere]
 
 
 class AnalyzeResult:
