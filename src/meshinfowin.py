@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Optional, List, Iterator, Tuple, Any, Callable
 
@@ -198,8 +199,15 @@ class MeshInfoHtmlCreator:
             sphere = self._analyze_result.data.edge_sphere_map.get(edge_index, None)
             if sphere:
                 cx, cy, cz = sphere.center
+                r = sphere.radius
                 yield f'sphere.center', f'({cx:.3f}, {cy:.3f}, {cz:.3f})'
-                yield f'sphere.radius', f'{sphere.radius:.3f}'
+                yield f'sphere.radius', f'{r:.3f}'
+
+                d1 = math.hypot(x1 - cx, y1 - cy, z1 - cz)
+                d2 = math.hypot(x2 - cx, y2 - cy, z2 - cz)
+                err1 = abs(d1 - r)
+                err2 = abs(d2 - r)
+                yield f'sphere.errors', f'{err1:.3f}, {err2:.3f}'
 
     def _face_rows(self, face_index: int) -> Iterator[Tuple[str, str]]:
         face_normal = self._mesh.face_normals[face_index]
