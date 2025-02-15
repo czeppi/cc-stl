@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List
 
-import trimesh
 import numpy as np
+import trimesh
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QMainWindow, QSplitter, QFileDialog, QMessageBox
 
 from meshinfowin import MeshInfoWin, MeshInfoWinHandlers
 from openglwidget import GL_VIEW_SIZE, OpenGlWin, OpenGlWinHandlers
@@ -26,12 +27,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("STL Example")
         self.resize(*GL_VIEW_SIZE)
 
-        orig_mesh = self._read_mesh(STL_FPATH)
-        self._mesh = self._add_xy_plane(orig_mesh)
+        self._mesh_orig = self._read_mesh(STL_FPATH)
+        self._mesh_moved = self._mesh_orig.copy()
+        self._mesh_with_plane = self._add_xy_plane(self._mesh_moved)
 
         self._add_menubar()
 
-        self._splitter = Splitter3D(self._mesh)
+        self._splitter = Splitter3D(self._mesh_with_plane)
         self.setCentralWidget(self._splitter)
 
     def _add_menubar(self):
@@ -39,6 +41,13 @@ class MainWindow(QMainWindow):
 
         file_menu = menu_bar.addMenu('File')
         file_menu.addAction(self._create_action('open...', self.on_file_open))
+
+        mesh_menu = menu_bar.addMenu('Mesh')
+        mesh_menu.addAction(self._create_action('rotate x', self.on_mesh_rotate_x))
+        mesh_menu.addAction(self._create_action('rotate y', self.on_mesh_rotate_y))
+        mesh_menu.addAction(self._create_action('rotate z', self.on_mesh_rotate_z))
+        mesh_menu.addAction(self._create_action('adjust z', self.on_mesh_adjust_xy_plane))
+        mesh_menu.addAction(self._create_action('restore to origin', self.on_mesh_restore_to_origin))
 
         help_menu  = menu_bar.addMenu('Help')
         help_menu.addAction(self._create_action('About', self.on_help_about))
@@ -79,16 +88,44 @@ class MainWindow(QMainWindow):
         return combined_mesh
 
     def on_file_open(self) -> None:
-        file_dlg = QFileDialog(self)
-        file_dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
-        file_dlg.setWindowTitle('Open File')
-        file_dlg.setDirectory(str(STL_DPATH))
-
-        ok = file_dlg.exec()
-        if not ok:
+        fpath_str, _ = QFileDialog.getOpenFileName(self, 'Open File', str(STL_DPATH))
+        if not fpath_str:
             return
 
-        self._splitter = Splitter3D(self._mesh)
+        fpath = Path(fpath_str)
+        if not fpath.exists():
+            return
+
+        self._mesh_orig = self._read_mesh(fpath)
+        self._mesh_moved = self._mesh_orig.copy()
+        self._mesh_with_plane = self._add_xy_plane(self._mesh_moved)
+
+        self._splitter = Splitter3D(self._mesh_with_plane)
+        self.setCentralWidget(self._splitter)
+
+    def on_mesh_rotate_x(self) -> None:
+        self._rotate_mesh_90_degree(direction=[1, 0, 0])
+
+    def on_mesh_rotate_y(self) -> None:
+        self._rotate_mesh_90_degree(direction=[0, 1, 0])
+
+    def on_mesh_rotate_z(self) -> None:
+        self._rotate_mesh_90_degree(direction=[0, 0, 1])
+
+    def on_mesh_adjust_xy_plane(self) -> None:
+        pass
+
+    def on_mesh_restore_to_origin(self) -> None:
+        self._mesh_moved = self._mesh_orig.copy()
+        self._mesh_with_plane = self._add_xy_plane(self._mesh_moved)
+        self._splitter = Splitter3D(self._mesh_with_plane)
+        self.setCentralWidget(self._splitter)
+
+    def _rotate_mesh_90_degree(self, direction: List[float]) -> None:
+        rotation_matrix = trimesh.transformations.rotation_matrix(math.pi / 2, direction)
+        self._mesh_moved.apply_transform(rotation_matrix)
+        self._mesh_with_plane = self._add_xy_plane(self._mesh_moved)
+        self._splitter = Splitter3D(self._mesh_with_plane)
         self.setCentralWidget(self._splitter)
 
     def on_help_about(self) -> None:
@@ -129,10 +166,3 @@ class Splitter3D(QSplitter):
         mesh_info_handlers = MeshInfoWinHandlers(
             change_colorizer=self._opengl_widget.on_change_colorizer)
         self._mesh_info_win.set_handlers(mesh_info_handlers)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    main_window = MainWindow()
-    main_window.show()
-    sys.exit(app.exec())

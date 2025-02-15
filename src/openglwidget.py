@@ -61,13 +61,6 @@ class OpenGlWin(QOpenGLWidget):
     def set_handlers(self, handlers: OpenGlWinHandlers) -> None:
         self._handlers = handlers
 
-    @staticmethod
-    def _rotate_mesh_90degree_around_x_axis(mesh: trimesh.Trimesh) -> None:
-        """ rotate mesh, so that z axis looks up instead of y axis
-        """
-        rot_mat = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
-        mesh.apply_transform(rot_mat)
-
     def initializeGL(self):
         self._faces_shader_program.link()
         self._edges_shader_program.link()
