@@ -53,7 +53,7 @@ FACES_FRAGMENT_SHADER_SRC = """
         float intensity = max(dot(viewDir, normal), 0.0);
         vec3 result = ambientColor * objectColor * intensity ;  // todo: offset is nor correct
 
-        fragColor = vec4(result, 1.0);
+        fragColor = vec4(result, 0.5);
     }
 """
 

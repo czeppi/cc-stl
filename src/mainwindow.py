@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 import trimesh
+import numpy as np
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QApplication, QSplitter, QFileDialog, QMessageBox
 
@@ -25,7 +26,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("STL Example")
         self.resize(*GL_VIEW_SIZE)
 
-        self._mesh = self._read_mesh(STL_FPATH)
+        orig_mesh = self._read_mesh(STL_FPATH)
+        self._mesh = self._add_xy_plane(orig_mesh)
 
         self._add_menubar()
 
@@ -51,6 +53,30 @@ class MainWindow(QMainWindow):
         mesh = trimesh.load(stl_path)
         #self._rotate_mesh_90degree_around_x_axis(mesh)
         return mesh
+
+    @staticmethod
+    def _add_xy_plane(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+        bbox = mesh.bounds
+        x_min, y_min, z_min = bbox[0]
+        x_max, y_max, z_max = bbox[1]
+        border = min(abs(x_max - x_min), abs(y_max - y_min)) / 2
+        x_min -= border
+        x_max += border
+        y_min -= border
+        y_max += border
+        xy_vertices = np.array([
+            [x_min, y_min, z_min],
+            [x_max, y_min, z_min],
+            [x_max, y_max, z_min],
+            [x_min, y_max, z_min],
+        ])
+        xy_faces = np.array([
+            [0, 1, 2],
+            [0, 2, 3],
+        ])
+        xy_plane = trimesh.Trimesh(vertices=xy_vertices, faces=xy_faces)
+        combined_mesh = trimesh.util.concatenate(mesh, xy_plane)
+        return combined_mesh
 
     def on_file_open(self) -> None:
         file_dlg = QFileDialog(self)
