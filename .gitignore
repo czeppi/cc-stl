@@ -4,3 +4,6 @@
 /stl-files/adapter_btu_bottom_v32.stl
 /venv
 __pycache__
+/src/cython/*.pyd
+/src/cython/*.cpp
+/src/cython/build
