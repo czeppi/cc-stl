@@ -11,27 +11,27 @@ from geo3d import Plane, EndlessCylinder, Line3D
 
 
 @dataclass
-class AnalyzeResultData:
+class GlobalAnalyzeResultData:
     surface_patches: List[SurfacePatch]
     edge_segments: List[EdgeSegment]
     stl_mesh: StlMesh
     edge_sphere_map: Dict[int, Sphere]
 
 
-class AnalyzeResult:
+class GlobalAnalyzeResult:
 
-    def __init__(self, result_data: AnalyzeResultData):
+    def __init__(self, result_data: GlobalAnalyzeResultData):
         self._result_data = result_data
         self._triangle_surface_patch_map = self._create_triangle_surface_patch_map(result_data)
 
     @staticmethod
-    def _create_triangle_surface_patch_map(analyze_result: AnalyzeResultData) -> Dict[int, SurfacePatch]:
+    def _create_triangle_surface_patch_map(analyze_result: GlobalAnalyzeResultData) -> Dict[int, SurfacePatch]:
         return {tri_index: patch
                 for patch in analyze_result.surface_patches
                 for tri_index in patch.triangle_indices}
 
     @property
-    def data(self) -> AnalyzeResultData:
+    def data(self) -> GlobalAnalyzeResultData:
         return self._result_data
 
     def find_surface_patch(self, face_index: int) -> Optional[SurfacePatch]:

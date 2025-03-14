@@ -8,17 +8,16 @@ import trimesh
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QToolBar, QWidget
 
-from analyzing.analyzeresult import AnalyzeResultData, AnalyzeResult
-from analyzing.geoanalyzer import GeoAnalyzer
+from analyzing.globalanalyzeresult import GlobalAnalyzeResultData, GlobalAnalyzeResult
+from analyzing.globalanalyzer import GlobalAnalyzer
 from camera import Camera
 from geo3d import Plane, Sphere
 from itemdetectoratmousepos import MeshItemKey, MeshItemType
-from meshcolorizer import MeshColorizer
 
 
 @dataclass
 class MeshInfoWinHandlers:
-    change_colorizer: Callable[[MeshColorizer], None]
+    on_global_analyze_complete: Callable[[GlobalAnalyzeResult], None]
 
 
 class MeshInfoWin(QWidget):
@@ -63,7 +62,7 @@ class MeshInfoWin(QWidget):
         self._camera: Optional[Camera] = None
         self._cur_item: Optional[MeshItemKey] = None
         self._sel_items: List[MeshItemKey] = []
-        self._analyze_result: Optional[AnalyzeResultData] = None
+        self._analyze_result: Optional[GlobalAnalyzeResultData] = None
 
         self._toolbar = self._create_toolbar()
         self._label = QLabel()
@@ -123,21 +122,20 @@ class MeshInfoWin(QWidget):
         self._label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
     def on_analyze(self) -> None:
-        geo_analyzer = GeoAnalyzer(self._mesh)
+        geo_analyzer = GlobalAnalyzer(self._mesh)
         result_data = geo_analyzer.analyze()
-        self._analyze_result = AnalyzeResult(result_data)
+        self._analyze_result = GlobalAnalyzeResult(result_data)
         self._toolbar.removeAction(self._analyze_action)
         self._update_label()
-        if self._handlers.change_colorizer:
-            colorizer = MeshColorizer(mesh=self._mesh, analyze_result=self._analyze_result)
-            self._handlers.change_colorizer(colorizer)
+        if self._handlers.on_global_analyze_complete:
+            self._handlers.on_global_analyze_complete(self._analyze_result)
 
 
 class MeshInfoHtmlCreator:
 
     def __init__(self, mesh: trimesh.Trimesh, camera: Camera,
                  cur_item: Optional[MeshItemKey], sel_items: List[MeshItemKey],
-                 analyze_result: Optional[AnalyzeResult]):
+                 analyze_result: Optional[GlobalAnalyzeResult]):
         self._mesh = mesh
         self._camera = camera
         self._cur_item = cur_item

@@ -95,6 +95,9 @@ class StlVertex:
         self._edges: List[StlEdge] = []
         self._faces: List[StlFace] = []
 
+    def __repr__(self) -> str:
+        return f'Vertex[{self.index}]({self._pos.x:.3f}, {self._pos.y:.3f}, {self._pos.z:.3f})'
+
     @property
     def index(self) -> int:
         return self._index
@@ -102,6 +105,12 @@ class StlVertex:
     @property
     def pos(self) -> Vector3D:
         return self._pos
+
+    def iter_edges(self) -> Iterator[StlEdge]:
+        yield from self._edges
+
+    def iter_faces(self) -> Iterator[StlFace]:
+        yield from self._faces
 
     def add_edge(self, edge: StlEdge) -> None:
         self._edges.append(edge)
@@ -120,6 +129,9 @@ class StlEdge:
         self._vertex2 = vertex2
         self._faces: List[StlFace] = []
 
+    def __repr__(self) -> str:
+        return f'Edge[{self.index}](V{self._vertex1.index}, V{self._vertex2.index})'
+
     @property
     def index(self) -> int:
         return self._index
@@ -136,6 +148,17 @@ class StlEdge:
     def faces(self) -> List[StlFace]:
         return self._faces
 
+    @property
+    def vertices(self) -> List[StlVertex]:
+        return [self._vertex1, self._vertex2]
+
+    def other_vertex(self, vertex: StlVertex) -> StlVertex:
+        if vertex.index == self._vertex1.index:
+            return self._vertex2
+        else:
+            assert vertex.index == self._vertex2.index
+            return self._vertex1
+
     def add_face(self, face: StlFace) -> None:
         self._faces.append(face)
 
@@ -148,6 +171,9 @@ class StlFace:
         self._index = index
         self._vertices: List[StlVertex] = [vertex1, vertex2, vertex3]
         self._edges: List[StlEdge] = [edge12, edge23, edge31]
+
+    def __repr__(self) -> str:
+        return f'Face[{self.index}](V{self._vertices[0].index}, V{self._vertices[1].index}, V{self._vertices[2].index})'
 
     @property
     def index(self) -> int:

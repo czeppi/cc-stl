@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+from scipy.signal import zpk2ss
+from sympy.benchmarks.bench_meijerint import normal
 
 
 @dataclass(frozen=True)
@@ -37,8 +39,13 @@ class Vector3D:
 
 @dataclass
 class Plane:
-    normal: Vector3D
+    normal: Vector3D  # normed normal vector
     distance: float  # from origin (>= 0)
+
+    def calc_distance_to_point(self, p: Vector3D) -> float:
+        x, y, z = p
+        a, b, c = self.normal
+        return abs(a * x + b * y + c * z - self.distance)
 
 
 @dataclass
@@ -79,3 +86,37 @@ def calc_sphere_from_4_points(p1: Vector3D, p2: Vector3D, p3: Vector3D, p4: Vect
     center = Vector3D(*center_array)
     radius = (p1 - center).length
     return Sphere(center=center, radius=radius)
+
+
+def calc_plane_from_3_points(p1: Vector3D, p2: Vector3D, p3: Vector3D) -> Plane:
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    x3, y3, z3 = p3
+
+    x21 = x2 - x1
+    x31 = x3 - x1
+    y21 = y2 - y1
+    y31 = y3 - y1
+    z21 = z2 - z1
+    z31 = z3 - z1
+
+    a = y21 * z31 - z21 * y31
+    b = z21 * x31 - x21 * z31
+    c = x21 * y31 - y21 * x31
+    l = math.hypot(a, b, c)
+    na = a / l
+    nb = b / l
+    nc = c / l
+
+    d = na * x1 + nb * y1 + nc * z1
+    return Plane(normal=Vector3D(na, nb, nc), distance=d)
+
+
+def calc_angle_from_3_points(p1: Vector3D, p2: Vector3D, p3: Vector3D) -> float:
+    """ to edges in a path must not connect in a sharp angle """
+    p12 = p1 - p2
+    p32 = p3 - p2
+
+    cos_phi = p12.dot(p32) / (p12.length * p32.length)
+    phi_degree = math.acos(cos_phi) * (180 / math.pi)
+    return phi_degree

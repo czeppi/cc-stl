@@ -11,6 +11,10 @@ from PySide6.QtGui import QMatrix4x4
 from PySide6.QtOpenGL import QOpenGLBuffer
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
+from analyzing.globalanalyzeresult import GlobalAnalyzeResult
+from analyzing.localanalyzer import LocalAnalyzer
+from analyzing.localanalyzeresult import LocalAnalyzeResultData
+from analyzing.stlmesh import StlMesh
 from camera import Camera
 from itemdetectoratmousepos import ItemDetectorAtMousePos, MeshItemType, MeshItemKey
 from meshcolorizer import MeshColorizer
@@ -38,6 +42,8 @@ class OpenGlWin(QOpenGLWidget):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
         self._mesh = mesh
+        self._global_analyze_result: Optional[GlobalAnalyzeResult] = None
+        self._local_analyze_result_data: Optional[LocalAnalyzeResultData] = None
         self._handlers: Optional[OpenGlWinHandlers] = None
         self._colorizer = MeshColorizer(mesh)
 
@@ -189,6 +195,12 @@ class OpenGlWin(QOpenGLWidget):
                                                    view_size=self._view_size)
             new_mesh_item = item_detector.find_cur_item(self._mouse_data.last_position)
             if new_mesh_item != self._cur_mesh_item:
+                if self._global_analyze_result:
+                    stl_mesh = self._global_analyze_result.data.stl_mesh
+                    self._local_analyze_result_data = LocalAnalyzer(stl_mesh).analyze_item(new_mesh_item)
+                    self._colorizer = MeshColorizer(mesh=self._mesh,
+                                                    global_analyze_result=self._global_analyze_result,
+                                                    local_analyze_result=self._local_analyze_result_data)
                 self._cur_mesh_item = new_mesh_item
                 self.update()  # update screen, for selected elements
 
@@ -214,5 +226,8 @@ class OpenGlWin(QOpenGLWidget):
         if self._handlers:
             self._handlers.change_camera_pos(self._camera)
 
-    def on_change_colorizer(self, colorizer: MeshColorizer) -> None:
-        self._colorizer = colorizer
+    def on_global_analyze_complete(self, global_analyze_result: GlobalAnalyzeResult) -> None:
+        self._global_analyze_result = global_analyze_result
+        self._colorizer = MeshColorizer(mesh=self._mesh,
+                                        global_analyze_result=global_analyze_result,
+                                        local_analyze_result=self._local_analyze_result_data)

@@ -3,7 +3,7 @@ from typing import Iterator
 import numpy as np
 import trimesh
 
-from analyzing.analyzeresult import SurfacePatch, SurfaceKind
+from analyzing.globalanalyzeresult import SurfacePatch, SurfaceKind
 from geo3d import Plane, Vector3D
 
 

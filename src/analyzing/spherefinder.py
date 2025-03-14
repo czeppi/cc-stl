@@ -2,7 +2,7 @@ from typing import Iterator, Tuple, Dict
 
 import numpy as np
 
-from analyzing.analyzeresult import SurfacePatch, SurfaceKind
+from analyzing.globalanalyzeresult import SurfacePatch, SurfaceKind
 from analyzing.quasiequalrowfinder import QuasiEqualRowFinder
 from analyzing.stlmesh import StlMesh
 from geo3d import Sphere, calc_sphere_from_4_points
@@ -18,7 +18,10 @@ class SphereFinder:
         for edge in self._mesh.iter_edges():
             if len(edge.faces) == 2:
                 vertices = {v.index: v for face in edge.faces for v in face.vertices}
-                assert len(vertices) == 4
+                #assert len(vertices) == 4
+                if len(vertices) != 4:
+                    continue
+
                 p1, p2, p3, p4 = [vertex.pos for vertex in vertices.values()]
                 sphere = calc_sphere_from_4_points(p1, p2, p3, p4)
                 if sphere:

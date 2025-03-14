@@ -152,7 +152,7 @@ class Splitter3D(QSplitter):
         self.addWidget(self._opengl_widget)
         self.addWidget(self._mesh_info_win)
 
-        self.setSizes([1, 250])
+        self.setSizes([1, 300])
 
         self.setStretchFactor(0, 1)
         self.setStretchFactor(1, 0)
@@ -164,5 +164,5 @@ class Splitter3D(QSplitter):
         self._opengl_widget.set_handlers(opengl_handlers)
 
         mesh_info_handlers = MeshInfoWinHandlers(
-            change_colorizer=self._opengl_widget.on_change_colorizer)
+            on_global_analyze_complete=self._opengl_widget.on_global_analyze_complete)
         self._mesh_info_win.set_handlers(mesh_info_handlers)
