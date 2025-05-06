@@ -7,7 +7,7 @@ import numpy as np
 import trimesh
 from OpenGL.GL import *
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QMatrix4x4
+from PySide6.QtGui import QMatrix4x4, QVector3D
 from PySide6.QtOpenGL import QOpenGLBuffer
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
@@ -42,6 +42,7 @@ class OpenGlWin(QOpenGLWidget):
     def __init__(self, mesh: trimesh.Trimesh):
         super().__init__()
         self._mesh = mesh
+        self._mesh_center = self._calc_mesh_center(mesh)
         self._global_analyze_result: Optional[GlobalAnalyzeResult] = None
         self._local_analyze_result_data: Optional[LocalAnalyzeResultData] = None
         self._handlers: Optional[OpenGlWinHandlers] = None
@@ -63,6 +64,21 @@ class OpenGlWin(QOpenGLWidget):
         self._cur_mesh_item: Optional[MeshItemKey] = None
 
         self.setMouseTracking(True)
+
+    @staticmethod
+    def _calc_mesh_center(mesh: trimesh.Trimesh) -> QVector3D:
+        x_min = mesh.vertices[:, 0].min()
+        x_max = mesh.vertices[:, 0].max()
+        y_min = mesh.vertices[:, 1].min()
+        y_max = mesh.vertices[:, 1].max()
+        z_min = mesh.vertices[:, 2].min()
+        z_max = mesh.vertices[:, 2].max()
+
+        x_mean = (x_min + x_max) / 2
+        y_mean = (y_min + y_max) / 2
+        z_mean = (z_min + z_max) / 2
+
+        return QVector3D(x_mean, y_mean, z_mean)
 
     def set_handlers(self, handlers: OpenGlWinHandlers) -> None:
         self._handlers = handlers
@@ -114,6 +130,8 @@ class OpenGlWin(QOpenGLWidget):
 
     def _calc_mvp_matrix(self) -> QMatrix4x4:
         model_matrix = self._create_eye_matrix()
+        model_matrix.translate(-self._mesh_center)
+
         view_matrix = self._camera.create_view_matrix()
         mvp_matrix = self._projection_matrix * view_matrix * model_matrix
         return mvp_matrix
