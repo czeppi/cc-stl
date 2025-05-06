@@ -189,9 +189,14 @@ class MeshInfoHtmlCreator:
         mesh_vertex2 = self._mesh.vertices[vertex2_index]
         x1, y1, z1 = mesh_vertex1
         x2, y2, z2 = mesh_vertex2
+        dx = x2 - x1
+        dy = y2 - y1
+        dz = z2 - z1
+        edge_len = math.hypot(dx, dy, dz)
 
         yield f'edge', str(edge_index)
-        yield f'dx, dy, dz', f'({x2 - x1:.3f}, {y2 - y1:.3f}, {z2 - z1:.3f})'
+        yield f'dx, dy, dz', f'({dx:.3f}, {dy:.3f}, {dz:.3f})'
+        yield f'len', f'({edge_len:.3f})'
 
         if self._analyze_result:
             sphere = self._analyze_result.data.edge_sphere_map.get(edge_index, None)
